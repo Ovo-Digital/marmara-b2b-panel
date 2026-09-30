@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marmara Barber B2B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="side" id="side">
+    <div class="side-logo"><img src="logo.png" alt="Marmara Barber"></div>
+    <div class="side-tag" id="sideTag">B2B BACK OFFICE</div>
+    <nav id="nav"></nav>
+    <button class="side-collapse" id="collapse" title="Menüyü daralt"></button>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <button class="icon-btn mobile-only" id="burger"></button>
+      <div class="search"><span class="i" data-i="search"></span><input placeholder="Sipariş, müşteri veya SKU ara…"></div>
+      <div class="mode-switch" id="modeSwitch">
+        <button data-mode="admin">Admin Paneli</button>
+        <button data-mode="customer">Müşteri Portalı</button>
+        <button data-mode="factory">Fabrika</button>
+      </div>
+      <div class="top-right">
+        <button class="icon-btn notif" id="notifBtn" title="Aksiyonlar"><span class="i" data-i="bell"></span><em>9</em></button>
+        <div class="me"><div class="avatar" id="avatar">VK</div><div><b id="meName">Volkan Koçkan</b><small id="meRole">Super Admin</small></div></div>
+      </div>
+    </header>
+    <section class="content" id="view"></section>
+  </div>
+</div>
+
+<div class="modal-wrap" id="modal"><div class="modal" id="modalBox"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
