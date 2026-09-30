@@ -1,7 +1,7 @@
 // Revize görselini özel revize reposuna uploads/ altına yükler, issue'da kullanılacak linki döner.
 // Token izni: Contents Read & write (aynı repo)
 
-const REPO = process.env.REVIZE_REPO || "Ovo-Digital/marmara-b2b-revizeler";
+const REPO = process.env.REVIZE_REPO || "volkankockan-ovo/marmara-b2b-revizeler";
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Sadece POST" });

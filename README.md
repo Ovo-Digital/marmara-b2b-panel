@@ -17,7 +17,7 @@ Kapsam: "Senso — Yeni B2B Sistemi Taslağı V2" sunumu.
 
 Sağ alttaki **Revize Modu** butonu ile müşteri ekranları gezerken herhangi bir öğeye tıklayıp not bırakır (Kalsın / Kaldırılsın / Değiştirilsin / Eklensin). Ayrıca her ekran için "ihtiyaç var mı / eksik ne" ve açık sorular sekmesi var.
 
-"Gönder" ile notlar `api/feedback.js` (Vercel fonksiyonu) üzerinden özel **Ovo-Digital/marmara-b2b-revizeler** reposuna GitHub issue olarak düşer: her aksiyon ayrı issue, gönderim başına bir özet issue.
+"Gönder" ile notlar `api/feedback.js` (Vercel fonksiyonu) üzerinden özel **volkankockan-ovo/marmara-b2b-revizeler** reposuna (revizeler netleşince Ovo-Digital'e taşınacak; taşıyınca Vercel'de `REVIZE_REPO` değişkenini güncelleyin) GitHub issue olarak düşer: her aksiyon ayrı issue, gönderim başına bir özet issue.
 
 Görseller önce `api/upload.js` ile aynı reponun `uploads/` klasörüne yüklenir, issue'da görünür.
 

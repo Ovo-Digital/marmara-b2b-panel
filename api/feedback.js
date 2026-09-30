@@ -1,7 +1,7 @@
 // Revize Modu'ndan gelen notları özel revize reposuna GitHub issue olarak yazar.
 // Vercel ortam değişkenleri: GITHUB_TOKEN (zorunlu, sadece Issues yazma izni), REVIZE_REPO (opsiyonel)
 
-const REPO = process.env.REVIZE_REPO || "Ovo-Digital/marmara-b2b-revizeler";
+const REPO = process.env.REVIZE_REPO || "volkankockan-ovo/marmara-b2b-revizeler";
 
 const ACTION = {
   kalsin: { label: null, title: "Kalsın", text: "Kalsın" },
