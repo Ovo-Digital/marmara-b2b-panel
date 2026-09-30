@@ -19,4 +19,6 @@ Sağ alttaki **Revize Modu** butonu ile müşteri ekranları gezerken herhangi b
 
 "Gönder" ile notlar `api/feedback.js` (Vercel fonksiyonu) üzerinden özel **Ovo-Digital/marmara-b2b-revizeler** reposuna GitHub issue olarak düşer: her aksiyon ayrı issue, gönderim başına bir özet issue.
 
-Vercel ortam değişkeni: `GITHUB_TOKEN` — sadece revize reposunda **Issues: Read and write** izni olan fine-grained token.
+Görseller önce `api/upload.js` ile aynı reponun `uploads/` klasörüne yüklenir, issue'da görünür.
+
+Vercel ortam değişkeni: `GITHUB_TOKEN` — sadece revize reposunda **Issues: Read and write** ve **Contents: Read and write** izni olan fine-grained token.

@@ -9,7 +9,17 @@ const ACTION = {
   degistir: { label: "degistir", title: "Değiştir", text: "Değiştirilsin" },
   ekle: { label: "ekle", title: "Ekle", text: "Buraya eklensin" },
 };
-const DEPT = { Satış: "satis", Operasyon: "operasyon", Fabrika: "fabrika", Finans: "finans", Yönetim: "yonetim" };
+// Serbest yazılan rolden bölüm etiketi
+const deptOf = (role = "") => {
+  const r = role.toLocaleLowerCase("tr");
+  if (/satış|satis|sales|export|ihracat/.test(r)) return "satis";
+  if (/operasyon|lojistik|sevk|operation/.test(r)) return "operasyon";
+  if (/fabrika|üretim|uretim|depo|factory/.test(r)) return "fabrika";
+  if (/finans|muhasebe|finance|mali/.test(r)) return "finans";
+  if (/yönetim|yonetim|müdür|mudur|genel|ceo|direkt|kurucu|sahip/.test(r)) return "yonetim";
+  return "diger";
+};
+const imgs = (list = []) => list.filter((x) => x && /^https:\/\/github\.com\//.test(x.url)).map((x, i) => `![görsel ${i + 1}](${x.url})`).join("\n");
 
 // Kullanıcı metninde @ ile birilerini etiketlemesin, markdown'ı bozmasın
 const clean = (s = "", max = 2000) => String(s).replace(/@/g, "@​").replace(/\r/g, "").slice(0, max).trim();
@@ -26,9 +36,9 @@ module.exports = async (req, res) => {
 
   const { reviewer = {}, items = [], screens = {}, answers = {} } = body;
   const who = clean(reviewer.name, 80);
-  const dept = clean(reviewer.dept, 40);
+  const dept = clean(reviewer.role || reviewer.dept, 60);
   if (!who) return res.status(400).json({ error: "İsim zorunlu" });
-  const deptLabel = DEPT[dept] || "diger";
+  const deptLabel = deptOf(dept);
   const when = new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
 
   const gh = async (path, data) => {
@@ -55,14 +65,15 @@ module.exports = async (req, res) => {
         `**İstek:** ${a.text}`,
         `**Öncelik:** ${it.prio === "high" ? "Olmazsa olmaz" : "Olsa iyi olur"}`,
         it.note ? `**Not:**\n${quote(it.note)}` : "**Not:** —",
+        it.imgs?.length ? `**Görseller:**\n${imgs(it.imgs)}` : "",
         `**Kimden:** ${who} (${dept || "—"}) · ${when}`,
         `<sub>seçici: \`${clean(it.target?.selector, 200)}\`</sub>`,
-      ].join("\n\n"),
+      ].filter(Boolean).join("\n\n"),
     });
   }
   for (const [route, s] of Object.entries(screens)) {
     if (s.need === "hayir") actionable.push({ title: `[Ekran gereksiz] ${clean(s.label, 80)}`, labels: ["ekran-kaldir", deptLabel], body: `**Ekran:** ${clean(s.label, 100)} — \`${clean(route, 100)}\`\n\n"Bu ekrana ihtiyacınız var mı?" → **Hayır**\n\n**Kimden:** ${who} (${dept || "—"}) · ${when}` });
-    if (s.missing && s.missing.trim()) actionable.push({ title: `[Eksik] ${clean(s.label, 60)} — ${clean(s.missing, 50)}`, labels: ["eksik", deptLabel], body: `**Ekran:** ${clean(s.label, 100)} — \`${clean(route, 100)}\`\n\n**Bu ekranda eksik olan:**\n${quote(s.missing)}\n\n**Kimden:** ${who} (${dept || "—"}) · ${when}` });
+    if ((s.missing && s.missing.trim()) || s.imgs?.length) actionable.push({ title: `[Eksik] ${clean(s.label, 60)} — ${clean(s.missing, 50) || "görsel"}`, labels: ["eksik", deptLabel], body: `**Ekran:** ${clean(s.label, 100)} — \`${clean(route, 100)}\`\n\n**Bu ekranda eksik olan:**\n${s.missing ? quote(s.missing) : "—"}${s.imgs?.length ? `\n\n**Görseller:**\n${imgs(s.imgs)}` : ""}\n\n**Kimden:** ${who} (${dept || "—"}) · ${when}` });
   }
 
   const keep = items.filter((it) => it.action === "kalsin");
@@ -70,6 +81,7 @@ module.exports = async (req, res) => {
   const screenRows = Object.entries(screens).filter(([, s]) => s.need || s.missing);
   const summary = [
     `**Kimden:** ${who} (${dept || "—"}) · ${when}`,
+    `**Halısaha sözü:** ${body.promise ? "verildi ✅" : "verilmedi ❌"}`,
     `**Toplam:** ${items.length} not · ${actionable.length} aksiyon · ${keep.length} "kalsın" · ${answered.length} cevaplanan soru`,
     screenRows.length ? `### Ekranlar\n| Ekran | İhtiyaç var mı? | Eksik |\n|---|---|---|\n${screenRows.map(([, s]) => `| ${clean(s.label, 80)} | ${{ evet: "Evet", hayir: "Hayır", emin: "Emin değil" }[s.need] || "—"} | ${clean(s.missing, 200).replace(/\n/g, " ").replace(/\|/g, "/") || "—"} |`).join("\n")}` : "",
     keep.length ? `### Kalsın dedikleri\n${keep.map((it) => `- ${clean(it.screenLabel, 60)} › ${clean(it.target?.card || it.target?.kind, 60)}${it.target?.text ? ` — "${clean(it.target.text, 40)}"` : ""}${it.note ? ` — _${clean(it.note, 200)}_` : ""}`).join("\n")}` : "",
