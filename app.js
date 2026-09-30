@@ -303,7 +303,7 @@ function log(no, msg) {
 
 // ——— grafik ———
 function barChart(data, { h = 230, prev = null, fmt = (v) => v, unit = "" } = {}) {
-  const W = 680, H = h, pl = 44, pb = 28, pt = 22;
+  const W = 680, H = h, pl = 64, pb = 28, pt = 22;
   const all = data.map((d) => d[1]).concat(prev ? prev : []);
   const max = Math.max(...all) * 1.15;
   const bw = (W - pl) / data.length;
@@ -487,13 +487,13 @@ ADMIN.customers = () => {
 
 ADMIN.application = (id) => {
   const c = C(id);
-  const opt = (arr, sel) => arr.map((a) => `<option ${a === sel ? "selected" : ""}>${a}</option>`).join("");
+  const opt = (arr, sel) => arr.map((a) => `<option value="${a}" ${a === sel ? "selected" : ""}>${a}</option>`).join("");
   return `${head(`Başvuru — ${c.name}`, "", `<button class="btn warn" onclick="toast('Ek bilgi talebi ${c.email} adresine gönderildi','send')">Bilgi İste</button><button class="btn danger" onclick="toast('Başvuru reddedildi','x')">Reddet</button><button class="btn ok" onclick="approveCustomer('${id}')">${ic("check")} Onayla</button>`, `<a href="#/admin/customers">Müşteriler</a> / Başvuru ${c.id}`)}
   <div class="grid g2">
     <div class="card"><div class="card-h"><h3>Başvuru Bilgileri</h3><span class="pill gold">Onay Bekliyor · ${c.applied}</span></div>
       <dl class="dl"><dt>Firma</dt><dd>${c.name}</dd><dt>Ülke / Şehir</dt><dd>${c.flag} ${c.country} · ${c.city}</dd><dt>Firma tipi</dt><dd>${c.type}</dd><dt>VAT</dt><dd class="mono">${c.vat}</dd><dt>Web sitesi</dt><dd>${c.website}</dd>
       <dt>İletişim</dt><dd>${c.contact} · ${c.position}</dd><dt>E-posta</dt><dd>${c.email}</dd><dt>WhatsApp / Tel</dt><dd>${c.phone}</dd><dt>İlgilendiği markalar</dt><dd>${c.brands}</dd></dl>
-      <div class="notice info mt">${ic("info")}<span>Onaylanana kadar müşteri portalda <b>fiyat ve stok göremez</b>; sadece "Pending Approval" ekranını görür.</span></div>
+      <div class="notice info mt">${ic("info")}<span>Onaylanana kadar müşteri portalda fiyat ve stok göremez; sadece "Pending Approval" ekranını görür.</span></div>
     </div>
     <div class="card"><div class="card-h"><h3>Admin Ataması</h3></div>
       <div class="form cols2">
@@ -633,12 +633,12 @@ ADMIN.pricing = () => {
   const cur = state.tab.list || "Europe", L = PRICE_LISTS[cur];
   return `${head("Fiyatlandırma", "", `<button class="btn">${ic("upload")} Excel İçe Aktar</button><button class="btn">${ic("download")} Dışa Aktar</button><button class="btn gold">${ic("plus")} Yeni Liste</button>`)}
   <div class="card flat" style="margin-bottom:18px"><div class="filters">
-    <span class="muted">Fiyat listesi</span><select onchange="state.tab.list=this.value;rerender()">${Object.keys(PRICE_LISTS).map((k) => `<option ${k === cur ? "selected" : ""}>${k}</option>`).join("")}</select>
+    <span class="muted">Fiyat listesi</span><select onchange="state.tab.list=this.value;rerender()">${Object.keys(PRICE_LISTS).map((k) => `<option value="${k}" ${k === cur ? "selected" : ""}>${k}</option>`).join("")}</select>
     <span class="pill plain">Para birimi: ${L.currency}</span><span class="pill plain">Geçerlilik: ${L.effective}</span><span class="pill plain">${CUSTOMERS.filter((c) => c.list === cur).length} müşteri</span></div></div>
   <div class="grid g-side"><div class="card">${pricingTable(cur)}</div>
   <div><div class="card"><div class="card-h"><h3>Fiyat Önceliği</h3></div>
     <ol style="margin:0;padding-left:18px;line-height:2"><li>Aktif müşteriye özel SKU fiyatı / kampanya</li><li>Kategori indirimi</li><li>Varsayılan fiyat listesi</li><li class="err-t">Fiyat yoksa → sipariş verilemez</li></ol>
-    <div class="notice gold mt">${ic("info")}<span>Müşteri yalnızca kendi <b>net fiyatını</b> görür; liste adı gösterilmez.</span></div></div>
+    <div class="notice gold mt">${ic("info")}<span>Müşteri yalnızca kendi net fiyatını görür; liste adı gösterilmez.</span></div></div>
   <div class="card mt"><div class="card-h"><h3>Değişiklik Logu</h3></div><ul class="tl">
     <li>PW-20 Salon Pro özel fiyat €0.95 (kampanya 01–30 Sep)<small>Gözde · 01 Sep 2026</small></li>
     <li>Europe listesi Excel ile güncellendi (16 SKU)<small>Ferhat · 01 Sep 2026</small></li>
@@ -831,7 +831,7 @@ ADMIN.finance = () => {
     <div class="card flat"><div class="card-h"><h3>Ödeme</h3><span class="pill ${ps[1]}">${ps[2]}</span></div>
       <div class="grid g2"><div><div class="muted">Alınan</div><div class="big-num">${money(o.paid, o.currency)}</div></div><div><div class="muted">Bakiye</div><div class="big-num warn-t">${money(t - o.paid, o.currency)}</div></div></div>
       <div class="form cols2 mt"><div class="field"><label>Tarih</label><input class="input" type="date" value="2026-09-30"></div><div class="field"><label>Tutar</label><input class="input" value="${Math.round(t - o.paid)}"></div>
-      <div class="field"><label>Para Birimi</label><select class="input"><option>${o.currency}</option></select></div><div class="field"><label>Banka</label><select class="input"><option>Bank A · ${o.currency}</option></select></div>
+      <div class="field"><label>Para Birimi</label><select class="input"><option value="${o.currency}">${o.currency}</option></select></div><div class="field"><label>Banka</label><select class="input"><option>Bank A · ${o.currency}</option></select></div>
       <div class="field span2"><label>SWIFT / Referans</label><input class="input" placeholder="…"></div><div class="field span2"><label>Dekont</label><button class="btn">${ic("upload")} Dosya yükle</button></div></div>
       <div class="section-title">Siparişlere Dağıt</div>
       <div class="stat-row"><span>SO-2026-0146 · bakiye ${money(t - o.paid, o.currency)}</span><input class="input alloc" style="width:110px;height:34px" value="${Math.round(t - o.paid)}" oninput="allocCalc()"></div>
@@ -859,7 +859,7 @@ ADMIN.reports = () => {
   const top = [["PW-20", 24500], ["SS-200", 19200], ["BC-400-02", 17400], ["MW-150", 15100], ["GAW-150", 12800]];
   return `${head("Raporlar & Analiz", "", `<button class="btn" onclick="toast('Excel indiriliyor','download')">${ic("download")} Excel</button><button class="btn" onclick="toast('PDF indiriliyor','download')">${ic("download")} PDF</button>`)}
   <div class="card flat" style="margin-bottom:18px"><div class="filters">
-    ${[["Son 3 Ay", "Bu Yıl", "Q3 2026", "Q3 2025"], ["Tüm Bölgeler", "Avrupa", "Orta Doğu", "Amerika", "BDT"], ["Tüm Ülkeler", "Germany", "USA", "Lithuania", "UAE"], ["Tüm Markalar", "Marmara Barber", "Marmara", "Noir"], ["Tüm Kategoriler", "Cologne", "Hair Styling", "Shaving"], ["Tüm Müşteriler", ...CUSTOMERS.filter((c) => c.status !== "Pending").map((c) => c.name)], ["Tüm SKU", ...PRODUCTS.map((p) => p.sku)], ["Tüm Satışçılar", "Ferhat", "Gözde"], ["Tüm Dövizler", "USD", "EUR"], ["Değer ($)", "Adet (pcs)"]].map((o) => `<select>${o.map((x) => `<option>${x}</option>`).join("")}</select>`).join("")}
+    ${[["Son 3 Ay", "Bu Yıl", "Q3 2026", "Q3 2025"], ["Tüm Bölgeler", "Avrupa", "Orta Doğu", "Amerika", "BDT"], ["Tüm Ülkeler", "Germany", "USA", "Lithuania", "UAE"], ["Tüm Markalar", "Marmara Barber", "Marmara", "Noir"], ["Tüm Kategoriler", "Cologne", "Hair Styling", "Shaving"], ["Tüm Müşteriler", ...CUSTOMERS.filter((c) => c.status !== "Pending").map((c) => c.name)], ["Tüm SKU", ...PRODUCTS.map((p) => p.sku)], ["Tüm Satışçılar", "Ferhat", "Gözde"], ["Tüm Dövizler", "USD", "EUR"], ["Değer ($)", "Adet (pcs)"]].map((o) => `<select>${o.map((x) => `<option value="${x}">${x}</option>`).join("")}</select>`).join("")}
     <button class="btn gold sm" onclick="toast('Filtre uygulandı')">Uygula</button></div></div>
   <div class="grid g4">${kpi("$1.24M", "Toplam Satış", "Son 3 ay", "trend", "+14%")}${kpi("486K", "Adet", "pcs", "box")}${kpi("92", "Sipariş", "Onaylı", "cart")}${kpi("18", "Ülke", "Aktif pazar", "globe")}</div>
   <div class="grid g-main mt">
@@ -885,7 +885,7 @@ function docsTable(en, cust) {
 function uploadDoc() {
   modal(`<h2>Doküman Yükle</h2><p class="muted">SKU / marka / ülke / dil etiketleri ile müşteri görünürlüğü belirlenir.</p>
   <div class="form cols2"><div class="field"><label>Tip</label><select class="input"><option>MSDS</option><option>CPNP</option><option>CPSR</option><option>INCI</option><option>Free Sale</option><option>Certificate</option></select></div>
-  <div class="field"><label>SKU</label><select class="input"><option>Tümü</option>${PRODUCTS.map((p) => `<option>${p.sku}</option>`).join("")}</select></div>
+  <div class="field"><label>SKU</label><select class="input"><option>Tümü</option>${PRODUCTS.map((p) => `<option value="${p.sku}">${p.sku}</option>`).join("")}</select></div>
   <div class="field"><label>Marka</label><select class="input"><option>Tümü</option><option>Marmara Barber</option><option>Marmara</option><option>Noir</option></select></div><div class="field"><label>Ülke</label><select class="input"><option>Tümü</option><option>AB</option><option>Germany</option><option>USA</option></select></div><div class="field"><label>Dil</label><input class="input" value="EN"></div><div class="field"><label>Geçerlilik</label><input class="input" type="date"></div>
   <div class="field span2"><label>Görünürlük</label><select class="input"><option>Tüm müşteriler</option><option>AB müşterileri</option><option>Seçili müşteriler</option><option>Sadece iç kullanım</option></select></div>
   <div class="field span2"><label>Dosya</label><button class="btn">${ic("upload")} PDF seç</button></div></div>
@@ -898,11 +898,11 @@ ADMIN.marketing = () => `${head("Marketing Hub", "", `<button class="btn gold" o
   <div class="grid g3 mt">${kpi("1,284", "İndirme · 30 gün", "", "download")}${kpi("Germany", "En aktif ülke", "", "globe")}${kpi("Powder Wax Kit", "En popüler", "", "image")}</div>`;
 function uploadContent() {
   modal(`<h2>İçerik Yükle</h2>
-  <div class="form cols2"><div class="field"><label>Tür</label><select class="input">${[...new Set(MARKETING.map((m) => m.kind))].map((k) => `<option>${k}</option>`).join("")}<option>Logos / Brand Assets</option></select></div>
+  <div class="form cols2"><div class="field"><label>Tür</label><select class="input">${[...new Set(MARKETING.map((m) => m.kind))].map((k) => `<option value="${k}">${k}</option>`).join("")}<option>Logos / Brand Assets</option></select></div>
   <div class="field"><label>Marka</label><select class="input"><option>Marmara Barber</option><option>Marmara</option><option>Noir</option></select></div>
   <div class="field"><label>Dil</label><select class="input"><option>EN</option><option>DE</option><option>AR</option><option>TR</option></select></div>
   <div class="field"><label>Bölge</label><select class="input"><option>Tümü</option><option>Avrupa</option><option>Orta Doğu</option><option>Amerika</option><option>BDT</option></select></div>
-  <div class="field span2"><label>SKU</label><select class="input"><option>—</option>${PRODUCTS.map((p) => `<option>${p.sku}</option>`).join("")}</select></div>
+  <div class="field span2"><label>SKU</label><select class="input"><option>—</option>${PRODUCTS.map((p) => `<option value="${p.sku}">${p.sku}</option>`).join("")}</select></div>
   <div class="field span2"><label>Dosyalar</label><button class="btn">${ic("upload")} Seç</button></div></div>
   <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="closeModal();toast('İçerik yüklendi · seçili bölge müşterilerine görünür')">Yükle</button></div>`);
 }
@@ -956,7 +956,7 @@ CUST.dashboard = () => {
     <div class="between mt wrap"><span class="muted">${money(orderTotal(active), active.currency)} · ${targetLabel(active.target)} · Payment: ${payState(active)[0]}</span><button class="btn sm" onclick="go('customer/order/${active.no}')">View order ${ic("chevR")}</button></div></div>` : ""}
   <div class="grid g-main mt"><div class="card"><div class="card-h"><h3>Recent Orders</h3><a class="sub" href="#/customer/orders">All →</a></div>${ordersTable(mine, true)}</div>
   <div class="card flat"><div class="card-h"><h3>Announcements</h3></div><ul class="tl"><li>New: Noir EDP 50 ml range now available to order.<small>22 Sep 2026</small></li><li>Q4 campaign on Hair Styling — see your net prices.<small>15 Sep 2026</small></li><li>Factory closed 29 Oct (national holiday).<small>10 Sep 2026</small></li></ul>
-  <div class="notice gold">${ic("trend")}<span>Your <b>October forecast</b> is due. It helps us plan production for you.</span></div></div></div>`;
+  <div class="notice gold">${ic("trend")}<span>Your October forecast is due. It helps us plan production for you.</span></div></div></div>`;
 };
 
 CUST.products = () => {
@@ -965,8 +965,8 @@ CUST.products = () => {
   const list = PRODUCTS.filter((p) => (f.brand === "all" || p.brand === f.brand) && (f.cat === "all" || p.cat === f.cat) && (!f.q || (p.name + p.sku).toLowerCase().includes(f.q.toLowerCase())));
   return `${head("Products / New Order", "")}
   <div class="filters" style="margin-bottom:18px">
-    <select onchange="state.filter.brand=this.value;rerender()"><option value="all">All brands</option>${brands.map((b) => `<option ${f.brand === b ? "selected" : ""}>${b}</option>`).join("")}</select>
-    <select onchange="state.filter.cat=this.value;rerender()"><option value="all">All categories</option>${cats.map((b) => `<option ${f.cat === b ? "selected" : ""}>${b}</option>`).join("")}</select>
+    <select onchange="state.filter.brand=this.value;rerender()"><option value="all">All brands</option>${brands.map((b) => `<option value="${b}" ${f.brand === b ? "selected" : ""}>${b}</option>`).join("")}</select>
+    <select onchange="state.filter.cat=this.value;rerender()"><option value="all">All categories</option>${cats.map((b) => `<option value="${b}" ${f.cat === b ? "selected" : ""}>${b}</option>`).join("")}</select>
     <div class="search" style="width:260px;height:38px"><span>${ic("search")}</span><input value="${f.q}" placeholder="Search SKU / product…" onchange="state.filter.q=this.value;rerender()"></div>
   </div>
   <div class="grid g-side">
@@ -1101,10 +1101,10 @@ CUST.account = () => { const c = C(ME); return `${head("Account", c.name)}
 CUST.register = () => {
   if (state.regDone) return `${head("Application received", "")}
   <div class="card" style="max-width:760px">${stepper(1, ["Application", "Under review", "Approved"])}
-    <div class="notice info mt">${ic("info")}<span>Your account is <b>Pending Approval</b>. Prices and stock will be visible once our team approves your application — usually within 1 business day.</span></div>
+    <div class="notice info mt">${ic("info")}<span>Your account is Pending Approval. Prices and stock will be visible once our team approves your application — usually within 1 business day.</span></div>
     <div class="row mt"><button class="btn" onclick="state.regDone=false;rerender()">New application</button><button class="btn gold" onclick="go('admin/customers')">Admin'de gör →</button></div></div>`;
   const f = (l, id, v = "", t = "text") => `<div class="field"><label>${l}</label><input class="input" id="${id}" type="${t}" value="${v}"></div>`;
-  const s = (l, id, opts) => `<div class="field"><label>${l}</label><select class="input" id="${id}">${opts.map((o) => `<option>${o}</option>`).join("")}</select></div>`;
+  const s = (l, id, opts) => `<div class="field"><label>${l}</label><select class="input" id="${id}">${opts.map((o) => `<option value="${o}">${o}</option>`).join("")}</select></div>`;
   return `${head("Create your B2B account", "")}
   <div class="card" style="max-width:1000px"><div class="form cols3">
     ${f("Company name *", "rgName")}${s("Country *", "rgCountry", ["Germany", "France", "Sweden", "USA", "UAE", "Saudi Arabia", "Lithuania", "Romania"])}${f("City", "rgCity")}

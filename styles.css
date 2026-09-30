@@ -359,3 +359,15 @@ input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
 .mini-stats b { display: block; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .mini-stats .prod-cell b { font-size: 14px; }
 @media (max-width: 760px) { .mini-stats { grid-template-columns: 1fr; } }
+
+/* dil seçici */
+.lang { position: relative; }
+.lang-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; font-size: 12.5px; }
+.lang-btn svg.ic { width: 16px; height: 16px; color: var(--muted); }
+.lang-menu { position: absolute; right: 0; top: 46px; min-width: 170px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.12); padding: 6px; display: none; z-index: 60; }
+.lang.open .lang-menu { display: block; }
+.lang-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; background: none; border-radius: 8px; cursor: pointer; font-size: 13px; text-align: left; }
+.lang-menu button b { width: 24px; font-size: 11px; color: var(--muted); }
+.lang-menu button:hover { background: var(--card-2); }
+.lang-menu button.on { background: #000; color: #fff; }
+.lang-menu button.on b { color: var(--accent-2); }
