@@ -12,3 +12,11 @@ Marmara Barber B2B sistemi için tıklanabilir tasarım demosu. Bu sürüm sadec
 Dosyalar: `index.html` (iskelet), `styles.css` (tema), `data.js` (demo verisi), `app.js` (ekranlar ve palet/konteyner hesabı), `img/` (ürün görselleri).
 
 Kapsam: "Senso — Yeni B2B Sistemi Taslağı V2" sunumu.
+
+## Revize Modu
+
+Sağ alttaki **Revize Modu** butonu ile müşteri ekranları gezerken herhangi bir öğeye tıklayıp not bırakır (Kalsın / Kaldırılsın / Değiştirilsin / Eklensin). Ayrıca her ekran için "ihtiyaç var mı / eksik ne" ve açık sorular sekmesi var.
+
+"Gönder" ile notlar `api/feedback.js` (Vercel fonksiyonu) üzerinden özel **Ovo-Digital/marmara-b2b-revizeler** reposuna GitHub issue olarak düşer: her aksiyon ayrı issue, gönderim başına bir özet issue.
+
+Vercel ortam değişkeni: `GITHUB_TOKEN` — sadece revize reposunda **Issues: Read and write** izni olan fine-grained token.
