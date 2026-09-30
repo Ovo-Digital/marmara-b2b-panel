@@ -16,7 +16,7 @@ const deptOf = (role = "") => {
   if (/operasyon|lojistik|sevk|operation/.test(r)) return "operasyon";
   if (/fabrika|üretim|uretim|depo|factory/.test(r)) return "fabrika";
   if (/finans|muhasebe|finance|mali/.test(r)) return "finans";
-  if (/yönetim|yonetim|müdür|mudur|genel|ceo|direkt|kurucu|sahip/.test(r)) return "yonetim";
+  if (/yönetim|yonetim|yönetici|yonetici|müdür|mudur|genel|ceo|direkt|kurucu|sahip/.test(r)) return "yonetim";
   return "diger";
 };
 const imgs = (list = []) => list.filter((x) => x && /^https:\/\/github\.com\//.test(x.url)).map((x, i) => `![görsel ${i + 1}](${x.url})`).join("\n");

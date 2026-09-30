@@ -406,7 +406,12 @@ ADMIN.dashboard = () => {
   <div class="grid g4">${r.kpis.map(([n, l, i, d]) => kpi(n, l, "", i, d)).join("")}</div>
 
   <div class="grid g-main mt">
-    <div class="card"><div class="card-h"><h3>Aylık Satış</h3></div>${barChart(MONTHLY_SALES, { fmt: (v) => "$" + Math.round(v) + "K" })}</div>
+    <div class="card"><div class="card-h"><h3>Aylık Satış</h3></div>
+      <div class="mini-stats">
+        <div><small>Ortalama aylık satış</small><b>$${(MONTHLY_SALES.reduce((s, [, v]) => s + v, 0) / MONTHLY_SALES.length).toFixed(1)}K</b></div>
+        <div class="prod-cell">${thumb(P(TOP_SELLER.sku))}<div><small>En çok satan · Eylül</small><b>${P(TOP_SELLER.sku).name}</b><small>${num(TOP_SELLER.pcs)} pcs · $${num(TOP_SELLER.value)}</small></div></div>
+      </div>
+      ${barChart(MONTHLY_SALES, { fmt: (v) => "$" + Math.round(v) + "K" })}</div>
     <div class="card dark"><div class="card-h"><h3>Aksiyon Gerekli <span class="pill err plain" style="margin-left:6px">${total}</span></h3><a class="sub" href="#/admin/notifications">Tümü →</a></div>
       <ul class="act">${r.acts.map((x) => actRow(...x)).join("")}</ul>
     </div>

@@ -80,6 +80,7 @@ const OVERRIDES = [
 const MONTHLY_SALES = [
   ["Oca", 286], ["Şub", 312], ["Mar", 341], ["Nis", 298], ["May", 377], ["Haz", 402], ["Tem", 365], ["Ağu", 391], ["Eyl", 428.65],
 ];
+const TOP_SELLER = { sku: "PW-20", pcs: 24500, value: 26950 };
 const COUNTRY_SALES = [["Germany", 82400], ["USA", 61200], ["Lithuania", 42600], ["UAE", 38900], ["Saudi Arabia", 31200], ["Romania", 18300]];
 
 const DOCUMENTS = [
