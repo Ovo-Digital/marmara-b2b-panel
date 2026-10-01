@@ -47,7 +47,7 @@ const STAGES = ["Satış İncelemesi", "Final Onay", "Ödeme Bekliyor", "Hazırl
 const STAGES_EN = ["Submitted", "Approved", "Payment", "Preparing", "Ready to Ship", "Shipped"];
 
 const ORDERS = [
-  { no: "SO-2026-0148", cust: "C-1021", date: "28 Sep 2026", currency: "USD", target: "20", stage: 0, paid: 0, reserveUntil: "", problem: false,
+  { no: "SO-2026-0148", cust: "C-1021", date: "28 Sep 2026", currency: "USD", target: "20", stage: 0, paid: 0, reserveUntil: "", problem: false, po: "ABC-PO-7781", note: "Please send the packing list before Friday so we can get freight quotes. Powder Wax boxes on the top pallets if possible.",
     items: [["PW-20", 90], ["SS-200", 68], ["BC-400-02", 108], ["MW-150", 271], ["GAW-150", 225], ["SG-77", 180], ["KS-1150", 135], ["NS-100", 113]] },
   { no: "SO-2026-0147", cust: "C-1017", date: "26 Sep 2026", currency: "USD", target: "40", stage: 1, paid: 0, reserveUntil: "10 Oct 2026", problem: false,
     items: [["BC-400-02", 413], ["BC-400-06", 275], ["MW-150", 413], ["GAW-150", 344], ["ED-50", 138], ["MS-750", 310], ["NS-100", 275]] },

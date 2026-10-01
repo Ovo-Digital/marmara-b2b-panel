@@ -60,8 +60,8 @@ const fx = (c) => (c === "EUR" ? 0.92 : 1);
 const money = (v, c = "USD", d = 0) => sym(c) + Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const num = (v) => Number(v).toLocaleString("en-US");
 const unitPrice = (p, c = "USD") => p.price * fx(c);
-const lineTotal = (sku, boxes, c = "USD") => { const p = P(sku); return boxes * p.pcsBox * unitPrice(p, c); };
-const orderTotal = (o) => o.items.reduce((s, [sku, b]) => s + lineTotal(sku, b, o.currency), 0);
+const lineTotal = (sku, boxes, c = "USD", price) => { const p = P(sku); return boxes * p.pcsBox * (price ?? unitPrice(p, c)); };
+const orderTotal = (o) => o.items.reduce((s, [sku, b, pr]) => s + lineTotal(sku, b, o.currency, pr), 0);
 const orderBoxes = (items) => items.reduce((s, [, b]) => s + b, 0);
 const targetLabel = (t) => (t === "pallet" ? "Palet" : SETTINGS.containers[t].label);
 const thumb = (p) => `<div class="thumb"><img src="img/${p.img}" alt=""></div>`;
@@ -554,7 +554,7 @@ ADMIN.orders = () => {
 
 ADMIN.order = (no) => {
   const o = O(no), c = C(o.cust), total = orderTotal(o), L = loadCalc(o.items, o.target), ps = payState(o);
-  const editable = o.stage <= 1;
+  const editable = o.stage < 5;
   const logs = state.logs[no] || [["" + o.date, "Sipariş oluşturuldu"], ["" + o.date, "Stok ve yükleme doğrulaması geçti"]];
   let action = "";
   if (o.stage === 0) action = `<div class="card-h"><h3>Satış İncelemesi</h3><span class="pill gold">Ferhat</span></div>
@@ -577,15 +577,18 @@ ADMIN.order = (no) => {
   else if (o.stage === 4) action = `<div class="card-h"><h3>Sevke Hazır</h3><span class="pill ok">Final packing onaylı</span></div><button class="btn gold block lg" onclick="go('admin/shipments')">${ic("truck")} Sevkiyatı kapat</button>`;
   else action = `<div class="card-h"><h3>Sevk Edildi</h3><span class="pill plain">Tamamlandı</span></div><div class="stat-row"><span>Forwarder</span><b>ABC Logistics</b></div><div class="stat-row"><span>Referans</span><b class="mono">BK-12345</b></div><div class="stat-row"><span>Konteyner</span><b class="mono">TCLU 482113-7</b></div>`;
 
-  return `${head(`${no}`, `${c.flag} ${c.name} · ${money(total, o.currency)} · ${targetLabel(o.target)}`, `${stagePill(o.stage)}<button class="btn" onclick="go('admin/loading/${no}')">${ic("container")} Yükleme Planı</button>`, `<a href="#/admin/orders">Siparişler</a> / ${no}`)}
+  return `${head(`${no}`, `${c.flag} ${c.name} · ${money(total, o.currency)} · ${targetLabel(o.target)}`, `${stagePill(o.stage)}${docButtons(o)}<button class="btn" onclick="go('admin/loading/${no}')">${ic("container")} Yükleme Planı</button>`, `<a href="#/admin/orders">Siparişler</a> / ${no}`)}
   <div class="card">${stepper(o.stage, STAGES)}</div>
   <div class="grid g-side mt">
     <div>
-      <div class="card"><div class="card-h"><h3>Sipariş Kalemleri</h3></div>
+      ${o.note || o.po ? `<div class="card note-card"><div class="card-h"><h3>${ic("edit")} Müşteri Notu</h3>${o.po ? `<span class="pill plain">PO: ${o.po}</span>` : ""}</div>${o.note ? `<p class="notranslate">${o.note.replace(/</g, "&lt;")}</p>` : ""}</div>` : ""}
+      <div class="card ${o.note || o.po ? "mt" : ""}"><div class="card-h"><h3>Sipariş Kalemleri</h3></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th class="c">Koli</th><th class="r">Adet</th><th class="r">Birim</th><th class="r">Toplam</th></tr></thead><tbody>
-        ${o.items.map(([sku, b], i) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td>
-          <td class="c">${editable ? `<input class="input" style="width:80px;height:34px;text-align:center" type="number" min="0" value="${b}" onchange="reviseItem('${no}',${i},this.value)">` : b}</td>
-          <td class="r muted">${num(b * p.pcsBox)}</td><td class="r muted">${money(unitPrice(p, o.currency), o.currency, 2)}</td><td class="r strong">${money(lineTotal(sku, b, o.currency), o.currency)}</td></tr>`; }).join("")}
+        ${o.items.map(([sku, b, pr], i) => { const p = P(sku), up = pr ?? unitPrice(p, o.currency), sh = o.shipped?.[sku]; return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small>${sh != null && sh < b ? ` <span class="pill warn">${sh} / ${b}</span>` : ""}</div></div></td>
+          <td class="c">${editable ? `<input class="input num-in" type="number" min="0" value="${b}" onchange="reviseItem('${no}',${i},this.value)">` : b}</td>
+          <td class="r muted">${num(b * p.pcsBox)}</td>
+          <td class="r">${editable ? `<div class="price-in"><span>${sym(o.currency)}</span><input class="input num-in" type="number" min="0" step="0.01" value="${up.toFixed(2)}" onchange="revisePrice('${no}',${i},this.value)"></div>` : `<span class="muted">${money(up, o.currency, 2)}</span>`}${pr != null ? `<br><small class="gold-t">${money(unitPrice(p, o.currency), o.currency, 2)} liste</small>` : ""}</td>
+          <td class="r strong">${money(lineTotal(sku, b, o.currency, pr), o.currency)}</td></tr>`; }).join("")}
         <tr><td colspan="4" class="r muted">Toplam · ${num(L.boxes)} koli · ${num(L.pcs)} adet</td><td class="r strong" style="font:600 18px var(--display)">${money(total, o.currency)}</td></tr>
         </tbody></table></div></div>
 
@@ -599,8 +602,6 @@ ADMIN.order = (no) => {
       <div class="card">${action}</div>
       <div class="card mt"><div class="card-h"><h3>Ticari Şartlar</h3></div>
         <div class="stat-row"><span>Teslim</span><b>${c.incoterm}</b></div><div class="stat-row"><span>Ödeme</span><b>${c.payment}</b></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Banka</span><b>${o.currency} Bank A</b></div><div class="stat-row"><span>Adres</span><b>${c.city} Warehouse</b></div></div>
-      <div class="card mt"><div class="card-h"><h3>Dokümanlar</h3></div>
-        ${[["Proforma Invoice", o.stage >= 2], ["Packing List", o.stage >= 4], ["Commercial Invoice", o.stage >= 5]].map(([d, ok]) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${d}</span>${ok ? `<button class="btn sm" onclick="toast('${d} PDF indiriliyor','download')">${ic("download")}</button>` : `<small class="dim">henüz yok</small>`}</div>`).join("")}</div>
     </div>
   </div>`;
 };
@@ -616,9 +617,58 @@ function advance(no, dir = 1) {
 function reviseItem(no, i, v) {
   const o = O(no), before = o.items[i][1];
   o.items[i][1] = Math.max(0, parseInt(v) || 0);
-  log(no, `Admin revize: ${o.items[i][0]} ${before} → ${o.items[i][1]} koli · yükleme yeniden hesaplandı`);
-  toast("Revize kaydedildi · palet/konteyner yeniden hesaplandı", "refresh");
+  log(no, `Admin revize: ${o.items[i][0]} ${before} → ${o.items[i][1]} koli · yükleme yeniden hesaplandı${o.stage >= 2 ? " · proforma yeni revizyon" : ""}`);
+  toast(o.stage >= 2 ? "Revize kaydedildi · proforma yeni revizyona düştü" : "Revize kaydedildi · palet/konteyner yeniden hesaplandı", "refresh");
   rerender();
+}
+function revisePrice(no, i, v) {
+  const o = O(no), it = o.items[i], p = P(it[0]), before = it[2] ?? unitPrice(p, o.currency);
+  const n = Math.max(0, Math.round((parseFloat(v) || 0) * 100) / 100);
+  it[2] = Math.abs(n - unitPrice(p, o.currency)) < 0.005 ? undefined : n;
+  log(no, `Admin fiyat revizesi: ${it[0]} ${money(before, o.currency, 2)} → ${money(n, o.currency, 2)}${o.stage >= 2 ? " · proforma yeni revizyon" : ""}`);
+  toast(o.stage >= 2 ? "Fiyat güncellendi · proforma yeni revizyona düştü" : "Fiyat güncellendi", "refresh");
+  rerender();
+}
+
+// ——— Dokümanlar: siparişin güncel hâlinden oluşur, yazdırılır / PDF kaydedilir ———
+const DOCS = { pi: "Proforma Invoice", pl: "Packing List", ci: "Commercial Invoice" };
+function docButtons(o) {
+  return `<div class="doc-btns">${Object.entries(DOCS).map(([k, d]) => { const ok = k !== "ci" || o.stage >= 5; return `<button class="btn" ${ok ? `onclick="openDoc('${o.no}','${k}')"` : "disabled"}>${ic("file")} ${k === "pi" ? "Proforma" : d}</button>`; }).join("")}</div>`;
+}
+function docHtml(no, type) {
+  const o = O(no), c = C(o.cust), cur = o.currency, final = type !== "pi" && o.shipped;
+  const rows = o.items.map(([sku, b, pr]) => { const p = P(sku), q = final ? o.shipped[sku] ?? b : b, up = pr ?? unitPrice(p, cur); return { p, q, up, pcs: q * p.pcsBox, net: q * p.kg * 0.86, gross: q * p.kg, cbm: (q * p.dims[0] * p.dims[1] * p.dims[2]) / 1e6 }; });
+  const L = loadCalc(rows.map((r) => [r.p.sku, r.q]), o.target);
+  const sum = (f) => rows.reduce((s, r) => s + r[f], 0);
+  const total = rows.reduce((s, r) => s + r.q * r.p.pcsBox * r.up, 0);
+  const draft = (type === "pi" && o.stage < 2) || (type === "pl" && o.stage < 4);
+  const head = type === "pl" ? "<th>SKU</th><th>Product</th><th>HS</th><th class=r>Boxes</th><th class=r>Pcs</th><th class=r>Net kg</th><th class=r>Gross kg</th><th class=r>CBM</th>" : "<th>SKU</th><th>Product</th><th>HS</th><th class=r>Boxes</th><th class=r>Pcs</th><th class=r>Unit</th><th class=r>Amount</th>";
+  const body = rows.map((r) => type === "pl"
+    ? `<tr><td>${r.p.sku}</td><td>${r.p.name}</td><td>${r.p.hs}</td><td class=r>${r.q}</td><td class=r>${num(r.pcs)}</td><td class=r>${r.net.toFixed(1)}</td><td class=r>${r.gross.toFixed(1)}</td><td class=r>${r.cbm.toFixed(3)}</td></tr>`
+    : `<tr><td>${r.p.sku}</td><td>${r.p.name}</td><td>${r.p.hs}</td><td class=r>${r.q}</td><td class=r>${num(r.pcs)}</td><td class=r>${money(r.up, cur, 2)}</td><td class=r>${money(r.q * r.p.pcsBox * r.up, cur, 2)}</td></tr>`).join("");
+  const foot = type === "pl"
+    ? `<tr><td colspan=3><b>TOTAL</b> · ${L.pallets.length} pallets${L.looseBoxes ? ` + ${L.looseBoxes} loose boxes` : ""}</td><td class=r><b>${num(sum("q"))}</b></td><td class=r><b>${num(sum("pcs"))}</b></td><td class=r><b>${sum("net").toFixed(1)}</b></td><td class=r><b>${(sum("gross") + L.pallets.length * 25).toFixed(1)}</b></td><td class=r><b>${sum("cbm").toFixed(2)}</b></td></tr>`
+    : `<tr><td colspan=6 class=r><b>TOTAL ${cur}</b></td><td class=r><b>${money(total, cur, 2)}</b></td></tr>`;
+  const pallets = type === "pl" ? `<h3>Pallets</h3><table><tr><th>Pallet</th><th>Contents</th><th class=r>Height</th><th class=r>Gross kg</th></tr>${L.pallets.map((p, i) => `<tr><td>${i + 1}</td><td>${[...new Set(p.segs.map((s) => s.sku))].join(", ")}</td><td class=r>${p.h} cm</td><td class=r>${num(p.kg)}</td></tr>`).join("")}</table>` : "";
+  const bank = type !== "pl" ? `<div class=box><b>Bank details — ${cur}</b><br>Bank A · ${cur} Account · IBAN TR12 0001 2345 6789 0000 000${cur === "EUR" ? 2 : 1} · SWIFT TGBATRIS</div>` : "";
+  return `<!doctype html><html><head><meta charset=utf-8><title>${DOCS[type]} ${no}</title><style>
+    body{font:13px/1.5 Inter,Arial,sans-serif;color:#111;margin:40px}h1{font-size:22px;margin:0}h3{margin:24px 0 8px}
+    .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:14px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:18px 0}.box{border:1px solid #ddd;border-radius:8px;padding:12px;margin-top:16px}
+    table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e5e5e5;padding:7px 6px;text-align:left}th{font-size:11px;text-transform:uppercase;color:#666}.r{text-align:right}
+    .draft{display:inline-block;background:#fff3d6;color:#7a5200;border:1px solid #e8c26f;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:700;margin-top:6px}
+    .print{position:fixed;bottom:20px;right:20px;padding:10px 16px;border:0;border-radius:8px;background:#000;color:#fff;font-weight:600;cursor:pointer}@media print{.print{display:none}body{margin:16mm}}
+    </style></head><body><button class=print onclick="print()">Print / Save PDF</button>
+    <div class=top><div><b style="font-size:16px;letter-spacing:.08em">SENSO COSMETICS</b><br><small>Düzce, Türkiye</small></div>
+    <div style="text-align:right"><h1>${DOCS[type]}</h1>${type === "pi" ? `PI-${no.slice(3)}` : type === "pl" ? `PL-${no.slice(3)}` : `CI-${no.slice(3)}`} · ${no}<br>${fmtDate(TODAY)}${draft ? "<br><span class=draft>DRAFT — current order data</span>" : ""}</div></div>
+    <div class=grid><div><small>BUYER</small><br><b>${c.name}</b><br>${c.city}, ${c.country}<br>VAT ${c.vat}${o.po ? `<br>PO ${o.po}` : ""}</div>
+    <div><small>TERMS</small><br>Incoterm: <b>${c.incoterm}</b><br>Payment: <b>${c.payment}</b><br>Loading: <b>${targetLabel(o.target)}</b><br>Origin: Türkiye</div></div>
+    <table><tr>${head}</tr>${body}${foot}</table>${pallets}${bank}</body></html>`;
+}
+function openDoc(no, type) {
+  const w = window.open("", "_blank");
+  if (!w) { toast("Açılır pencere engellendi — tarayıcıda izin verin", "alert"); return; }
+  w.document.write(docHtml(no, type)); w.document.close();
 }
 
 // ——— Fiyatlandırma ———
@@ -1047,7 +1097,7 @@ CUST.checkout = () => {
       </tbody></table></div></div>
     <div class="card mt"><div class="card-h"><h3>Loading</h3><span class="pill ${L.complete ? "ok" : "warn"}">${L.complete ? "COMPLETE ✓" : "INCOMPLETE"}</span></div>
       <div class="stat-row"><span>Target</span><b>${targetLabel(state.cartTarget)}</b></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length} complete</b></div>${state.cartTarget !== "pallet" ? `<div class="stat-row"><span>Loose load</span><b>${L.looseBoxes} boxes</b></div><div class="stat-row"><span>Container load</span><b>${L.pct}%</b></div>` : ""}</div>
-    <div class="card mt"><div class="form cols2"><div class="field"><label>Delivery Address</label><select class="input"><option>Berlin Warehouse — Lagerstr. 12, 13407 Berlin</option><option>Hamburg Hub</option></select></div><div class="field"><label>Your PO Number</label><input class="input" placeholder="Optional"></div><div class="field span2"><label>Order Notes</label><textarea class="input" placeholder="Optional…"></textarea></div></div></div>
+    <div class="card mt"><div class="form cols2"><div class="field"><label>Delivery Address</label><select class="input"><option>Berlin Warehouse — Lagerstr. 12, 13407 Berlin</option><option>Hamburg Hub</option></select></div><div class="field"><label>Your PO Number</label><input class="input" id="ckPo" placeholder="Optional"></div><div class="field span2"><label>Order Notes</label><textarea class="input" id="ckNote" placeholder="Optional…"></textarea></div></div></div>
   </div>
   <div><div class="card cartp"><div class="card-h"><h3>Order Summary</h3></div>
     <div class="stat-row"><span>Subtotal</span><b>${money(total, "USD", 2)}</b></div><div class="stat-row"><span>Shipping term</span><b>EXW Düzce</b></div><div class="stat-row"><span>Payment term</span><b>100% Advance</b></div><div class="stat-row"><span>Boxes</span><b>${num(L.boxes)}</b></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length}</b></div>
@@ -1059,7 +1109,7 @@ CUST.checkout = () => {
 };
 function placeOrder() {
   const no = "SO-2026-0" + (149 + ORDERS.length - 8);
-  ORDERS.unshift({ no, cust: ME, date: "30 Sep 2026", currency: "USD", target: state.cartTarget, stage: 0, paid: 0, reserveUntil: "", problem: false, items: cartItems().map(([s, b]) => [s, b]) });
+  ORDERS.unshift({ no, cust: ME, date: "30 Sep 2026", currency: "USD", target: state.cartTarget, stage: 0, paid: 0, reserveUntil: "", problem: false, items: cartItems().map(([s, b]) => [s, b]), note: $("#ckNote")?.value.trim() || "", po: $("#ckPo")?.value.trim() || "" });
   state.logs[no] = [["30 Sep 2026", "ABC Distribution siparişi portaldan oluşturdu"]];
   state.cart = {};
   toast(`Order ${no} submitted · your sales rep Ferhat has been notified`);
@@ -1071,11 +1121,12 @@ CUST.order = (no) => {
   const o = O(no), L = loadCalc(o.items, o.target), ps = payState(o), t = orderTotal(o);
   return `${head(`Order ${no}`, `${o.date} · ${money(t, o.currency)} · ${targetLabel(o.target)}`, `<button class="btn" onclick="reorder('${no}')">${ic("copy")} Reorder</button>`, `<a href="#/customer/orders">My Orders</a> / ${no}`)}
   <div class="card">${stepper(Math.min(o.stage, 5), STAGES_EN)}</div>
+  ${o.note || o.po ? `<div class="card note-card mt"><div class="card-h"><h3>${ic("edit")} Your Note</h3>${o.po ? `<span class="pill plain">PO: ${o.po}</span>` : ""}</div>${o.note ? `<p class="notranslate">${o.note.replace(/</g, "&lt;")}</p>` : ""}</div>` : ""}
   <div class="grid g-side mt"><div class="card"><div class="card-h"><h3>Products</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Total</th></tr></thead><tbody>
-    ${o.items.map(([sku, b]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(sku, b, o.currency), o.currency)}</td></tr>`; }).join("")}
+    ${o.items.map(([sku, b, pr]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(sku, b, o.currency, pr), o.currency)}</td></tr>`; }).join("")}
     </tbody></table></div></div>
   <div><div class="card"><div class="card-h"><h3>Summary</h3></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length}</b></div><div class="stat-row"><span>Boxes / pcs</span><b>${num(L.boxes)} / ${num(L.pcs)}</b></div><div class="stat-row"><span>Payment</span><b><span class="pill ${ps[1]}">${ps[0]}</span></b></div><div class="stat-row"><span>Paid / Balance</span><b>${money(o.paid, o.currency)} / ${money(Math.max(0, t - o.paid), o.currency)}</b></div><div class="stat-row"><span>Incoterm</span><b>EXW Düzce</b></div></div>
-  <div class="card mt"><div class="card-h"><h3>Documents</h3></div>${[["Proforma Invoice", o.stage >= 2], ["Packing List", o.stage >= 4], ["Commercial Invoice", o.stage >= 5]].map(([d, ok]) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${d}</span>${ok ? `<button class="btn sm" onclick="toast('Downloading ${d}','download')">${ic("download")}</button>` : `<small class="dim">not yet</small>`}</div>`).join("")}</div></div></div>`;
+  <div class="card mt"><div class="card-h"><h3>Documents</h3></div>${[["pi", "Proforma Invoice", true], ["pl", "Packing List", true], ["ci", "Commercial Invoice", o.stage >= 5]].map(([k, d, ok]) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${d}</span>${ok ? `<button class="btn sm" onclick="openDoc('${o.no}','${k}')">${ic("download")}</button>` : `<small class="dim">not yet</small>`}</div>`).join("")}</div></div></div>`;
 };
 function reorder(no) {
   const o = O(no);
@@ -1147,11 +1198,34 @@ FACT.prep = (no) => {
       <td class="c"><div class="qty" style="width:150px;margin:auto"><button onclick="prepSet('${no}','${s}',${d - 1})">−</button><input value="${d}" onchange="prepSet('${no}','${s}',this.value)"><button onclick="prepSet('${no}','${s}',${d + 1})">+</button></div></td>
       <td class="c">${d >= b ? '<span class="pill ok">✓ Tamam</span>' : d > 0 ? `<span class="pill warn">${b - d} eksik</span>` : '<span class="pill plain">Bekliyor</span>'}</td></tr>`; }).join("")}
     </tbody></table></div>
-    <div class="between mt wrap"><button class="btn danger" onclick="reportProblem('${no}')">${ic("alert")} Problem Bildir</button><button class="btn ok lg" ${allDone && allChecked ? "" : "disabled"} onclick="O('${no}').stage=4;O('${no}').problem=false;toast('Hazırlık tamamlandı · Operasyon final packing kontrolüne düştü');rerender()">${ic("check")} Hazırlık Tamamlandı</button></div></div>
+    <div class="between mt wrap"><button class="btn danger" onclick="reportProblem('${no}')">${ic("alert")} Problem Bildir</button>${o.stage === 4 ? `<span class="pill ok">${ic("check")} Hazırlık Tamamlandı</span>` : !allChecked ? `<button class="btn lg" disabled>${ic("layers")} Paletleri kontrol edin (${pc.filter(Boolean).length}/${pc.length})</button>` : allDone ? `<button class="btn ok lg" onclick="finishPrep('${no}')">${ic("check")} Hazırlık Tamamlandı</button>` : `<button class="btn warn lg" onclick="finishShort('${no}')">${ic("alert")} Eksikle Tamamla</button>`}</div></div>
   <div class="card flat"><div class="card-h"><h3>Palet Planı</h3></div>${palletVisual(L, true)}${skuLegend(o.items)}
-    <div class="divider"></div>${L.pallets.map((p, i) => `<div class="stat-row"><label class="row" style="cursor:pointer"><input type="checkbox" ${pc[i] ? "checked" : ""} ${allDone ? "" : "disabled"} onchange="state.palletCheck['${no}'][${i}]=this.checked;rerender()"><span>Palet ${i + 1} · ${[...new Set(p.segs.map((x) => x.sku))].join(", ")}</span></label><b>${p.h} cm · ${num(p.kg)} kg</b></div>`).join("")}
+    <div class="divider"></div>${L.pallets.map((p, i) => `<div class="stat-row"><label class="row" style="cursor:pointer"><input type="checkbox" ${pc[i] ? "checked" : ""} ${o.stage === 4 ? "disabled" : ""} onchange="state.palletCheck['${no}'][${i}]=this.checked;rerender()"><span>Palet ${i + 1} · ${[...new Set(p.segs.map((x) => x.sku))].join(", ")}</span></label><b>${p.h} cm · ${num(p.kg)} kg</b></div>`).join("")}
     </div></div>`;
 };
+function finishPrep(no) {
+  const o = O(no); o.stage = 4; o.problem = false; o.shipped = { ...state.prep[no] };
+  log(no, "Hazırlık tamamlandı · final packing kontrolüne gönderildi");
+  toast("Hazırlık tamamlandı · Operasyon final packing kontrolüne düştü"); rerender();
+}
+function finishShort(no) {
+  const o = O(no), pr = state.prep[no];
+  const miss = o.items.filter(([s, b]) => (pr[s] || 0) < b);
+  modal(`<h2>Eksikle Tamamla</h2>
+  <div class="tbl-wrap" style="margin:0"><table class="tbl"><thead><tr><th>Ürün</th><th class="r">Gerekli</th><th class="r">Hazırlanan</th><th class="r">Eksik</th></tr></thead><tbody>
+  ${miss.map(([s, b]) => `<tr><td><b>${P(s).name}</b><br><small class="mono">${s}</small></td><td class="r">${b} koli</td><td class="r">${pr[s] || 0} koli</td><td class="r err-t strong">${b - (pr[s] || 0)} koli</td></tr>`).join("")}
+  </tbody></table></div>
+  <div class="field mt"><label>Not</label><textarea class="input" id="shortNote" placeholder="Örn. kalan 2 koli bir sonraki sevkiyata eklenecek"></textarea></div>
+  <div class="notice warn mt">${ic("info")}<span>Satış + Operasyon bilgilendirilir. Packing List ve Commercial Invoice hazırlanan miktarlarla oluşur.</span></div>
+  <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn warn" onclick="confirmShort('${no}')">Eksikle Tamamla</button></div>`);
+}
+function confirmShort(no) {
+  const o = O(no), pr = state.prep[no], note = $("#shortNote")?.value.trim();
+  o.shipped = { ...pr }; o.stage = 4; o.problem = false;
+  const miss = o.items.filter(([s, b]) => (pr[s] || 0) < b).map(([s, b]) => `${s} ${pr[s] || 0}/${b}`).join(", ");
+  log(no, `Hazırlık eksikle tamamlandı: ${miss}${note ? " · Not: " + note : ""}`);
+  closeModal(); toast("Eksikle tamamlandı · Satış + Operasyon bilgilendirildi", "alert"); rerender();
+}
 function prepSet(no, sku, v) {
   const need = O(no).items.find(([s]) => s === sku)[1];
   state.prep[no][sku] = Math.max(0, Math.min(need, parseInt(v) || 0));
