@@ -385,6 +385,55 @@ function containerStats(L) {
 // ═════════════════════════════ ADMIN ═════════════════════════════
 const ADMIN = {};
 
+// ——— Tarih aralığı (gösterge paneli) ———
+const iso = (d) => d.toISOString().slice(0, 10);
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const RANGE_PRESETS = () => {
+  const t = TODAY, y = t.getFullYear(), m = t.getMonth();
+  return [
+    ["Son 7 gün", addDays(t, -6), t], ["Son 30 gün", addDays(t, -29), t],
+    ["Bu ay", new Date(y, m, 1, 12), t], ["Geçen ay", new Date(y, m - 1, 1, 12), new Date(y, m, 0, 12)],
+    ["Son 3 ay", new Date(y, m - 2, 1, 12), t], ["Bu yıl", new Date(y, 0, 1, 12), t],
+  ];
+};
+state.range ??= { from: "2026-09-01", to: "2026-09-30", preset: "Bu ay" };
+function rangeLabel() {
+  const f = new Date(state.range.from + "T12:00"), t = new Date(state.range.to + "T12:00");
+  const loc = { tr: "tr-TR", en: "en-GB", es: "es-ES", de: "de-DE", ru: "ru-RU" }[typeof LANG === "string" ? LANG : "tr"];
+  return new Intl.DateTimeFormat(loc, { day: "numeric", month: "long", year: "numeric" }).formatRange(f, t);
+}
+function rangePicker() {
+  const r = state.range;
+  return `<div class="range" id="rangeBox"><button class="btn" onclick="this.parentNode.classList.toggle('open')">${ic("calendar")} <span class="notranslate">${rangeLabel()}</span></button>
+    <div class="range-pop">
+      <div class="range-presets">${RANGE_PRESETS().map(([l, f, t]) => `<button class="${r.preset === l ? "on" : ""}" onclick="setRange('${iso(f)}','${iso(t)}','${l}')">${l}</button>`).join("")}</div>
+      <div class="range-custom"><div class="rv-sl" style="color:var(--muted)">Özel aralık</div>
+        <div class="form cols2"><div class="field"><label>Başlangıç</label><input class="input" type="date" id="rgFrom" value="${r.from}" max="${iso(TODAY)}"></div><div class="field"><label>Bitiş</label><input class="input" type="date" id="rgTo" value="${r.to}" max="${iso(TODAY)}"></div></div>
+        <button class="btn primary block mt" onclick="setRange($('#rgFrom').value,$('#rgTo').value,'')">Uygula</button></div>
+    </div></div>`;
+}
+function setRange(from, to, preset) {
+  if (!from || !to || from > to) { toast("Başlangıç tarihi bitişten sonra olamaz", "alert"); return; }
+  state.range = { from, to, preset };
+  rerender();
+  toast("Tarih aralığı uygulandı", "calendar");
+}
+// Aralıktaki satış: aylık satışın günlük ortalamasıyla hesaplanır (demo)
+function rangeSales() {
+  let s = 0;
+  for (let d = new Date(state.range.from + "T12:00"); iso(d) <= state.range.to; d = addDays(d, 1)) {
+    const m = MONTHLY_SALES[d.getMonth()];
+    if (d.getFullYear() === 2026 && m) s += (m[1] * 1000) / new Date(2026, d.getMonth() + 1, 0).getDate();
+  }
+  return s;
+}
+function rangeKpis(r) {
+  if (state.dashRole !== "mgmt") return r.kpis;
+  const s = rangeSales(), isSep = state.range.from === "2026-09-01" && state.range.to === "2026-09-30";
+  return [[money(Math.round(s)), "Satış", "trend", isSep ? "+9.6%" : ""], [num(Math.max(1, Math.round((s / 428650) * 31))), "Sipariş sayısı", "cart"], [money(Math.round(s * 0.901)), "Tahsilat", "wallet"], ["$510,000", "Ekim forecast", "trend"]];
+}
+document.addEventListener("click", (e) => { if (!e.target.closest("#rangeBox")) $("#rangeBox")?.classList.remove("open"); });
+
 const DASH_ROLES = {
   mgmt: { label: "Yönetim", kpis: [["$428,650", "Bu ay satış", "trend", "+9.6%"], ["31", "Sipariş", "cart"], ["$386,200", "Tahsilat", "wallet"], ["$510,000", "Ekim forecast", "trend"]],
     acts: [["err", "cart", "Onay bekleyen sipariş", 2, "admin/orders"], ["warn", "clock", "Süresi dolan rezervasyon", 1, "admin/products/res"], ["err", "factory", "Hazırlık problemi", 2, "admin/preparation"], ["warn", "trend", "Eksik forecast", 3, "admin/forecast"], ["warn", "file", "Süresi dolan doküman", 1, "admin/documents"]] },
@@ -402,8 +451,8 @@ ADMIN.dashboard = () => {
   const low = PRODUCTS.filter((p) => stockState(p) !== "in").length;
   const total = r.acts.reduce((s, x) => s + x[3], 0);
   return `
-  ${head("Gösterge Paneli", "", `<select class="input" style="width:190px" onchange="state.dashRole=this.value;rerender()">${Object.entries(DASH_ROLES).map(([k, v]) => `<option value="${k}" ${k === state.dashRole ? "selected" : ""}>Görünüm: ${v.label}</option>`).join("")}</select><button class="btn">${ic("calendar")} 1 – 30 Eylül 2026</button>`)}
-  <div class="grid g4">${r.kpis.map(([n, l, i, d]) => kpi(n, l, "", i, d)).join("")}</div>
+  ${head("Gösterge Paneli", "", `<select class="input" style="width:190px" onchange="state.dashRole=this.value;rerender()">${Object.entries(DASH_ROLES).map(([k, v]) => `<option value="${k}" ${k === state.dashRole ? "selected" : ""}>Görünüm: ${v.label}</option>`).join("")}</select>${rangePicker()}`)}
+  <div class="grid g4">${rangeKpis(r).map(([n, l, i, d]) => kpi(n, l, "", i, d)).join("")}</div>
 
   <div class="grid g-main mt">
     <div class="card"><div class="card-h"><h3>Aylık Satış</h3></div>

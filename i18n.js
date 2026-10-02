@@ -57,6 +57,7 @@ function setLang(l) {
   try { localStorage.setItem("mbLang", l); } catch {}
   document.documentElement.lang = l;
   i18nObs.disconnect();
+  if (typeof rerender === "function" && document.querySelector("#view .notranslate")) rerender();   // dil biçimli tarihler yeniden çizilsin
   i18nTree(document.body);
   i18nMenu();
   i18nWatch();

@@ -382,3 +382,13 @@ input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
 .note-card { border-left: 4px solid var(--accent-2); background: #fffaf0; }
 .note-card p { margin: 0; font-size: 14px; line-height: 1.55; }
 .note-card h3 { display: flex; align-items: center; gap: 8px; }
+
+/* tarih aralığı seçici */
+.range { position: relative; }
+.range-pop { position: absolute; right: 0; top: 46px; z-index: 40; display: none; width: 420px; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.12); padding: 14px; }
+.range.open .range-pop { display: block; }
+.range-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.range-presets button { height: 36px; border-radius: 8px; border: 1px solid var(--line-2); background: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.range-presets button:hover { background: var(--card-2); }
+.range-presets button.on { background: #000; color: #fff; border-color: #000; }
+@media (max-width: 760px) { .range-pop { width: calc(100vw - 32px); right: -60px; } }
