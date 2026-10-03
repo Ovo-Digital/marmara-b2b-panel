@@ -17,6 +17,8 @@ const RV_QUESTIONS = [
 const RV_PICK = [".btn", ".chip", ".seg", ".qty", ".field", ".stat-row", ".tbl thead", ".tbl tbody tr", ".pcard", ".asset", ".kpi", ".pipe-col", ".act li", ".sugg", ".step", ".pv", ".container-vis", ".tabs", ".filters", ".legend", ".chart", ".notice", ".card-h", ".card", ".page-head"].join(",");
 const RV_PICK_IN = "#view " + RV_PICK.split(",").join(",#view ");
 const RV_MAX_IMGS = 3;
+// Vercel dışında (lokal dosya vb.) açıldıysa gönderim canlı sunucuya gider
+const RV_API = /vercel\.app$/.test(location.hostname) ? "" : "https://marmara-b2b-panel.vercel.app/";
 
 let rv = rvLoad();
 let rvOn = false;
@@ -272,7 +274,7 @@ function rvReview() {
 async function rvUploadImgs(list) {
   for (const x of list || []) {
     if (x.url) continue;
-    const r = await fetch("api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: x.data }) });
+    const r = await fetch(RV_API + "api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: x.data }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Görsel yüklenemedi");
     x.url = j.url; delete x.data; rvSave();
@@ -286,7 +288,7 @@ async function rvSend() {
     for (const i of p.items) await rvUploadImgs(i.imgs);
     for (const s of Object.values(p.screens)) await rvUploadImgs(s.imgs);
     p = rvPayload();
-    const r = await fetch("api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
+    const r = await fetch(RV_API + "api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.status);
     rv.sent.push(...p.items.map((i) => i.id));
@@ -295,7 +297,7 @@ async function rvSend() {
     rvSave(); rvClose(); rvFab(); rvDrawer();
     toast("Revizeleriniz iletildi, teşekkürler!");
   } catch (e) {
-    $("#rvPop .m-actions").innerHTML = `<span class="err-t" style="margin-right:auto;font-size:12.5px">Gönderilemedi. Notlarınız bu tarayıcıda duruyor.</span><button class="btn" onclick="rvCopy()">${ic("copy")} Metin olarak kopyala</button><button class="btn primary" id="rvSendBtn" onclick="rvSend()">Tekrar dene</button>`;
+    $("#rvPop .m-actions").innerHTML = `<span class="err-t" style="margin-right:auto;font-size:12.5px">Gönderilemedi. Notlarınız bu tarayıcıda duruyor.<br><small class="muted notranslate">${rvEsc(String(e.message || e))}</small></span><button class="btn" onclick="rvCopy()">${ic("copy")} Metin olarak kopyala</button><button class="btn primary" id="rvSendBtn" onclick="rvSend()">Tekrar dene</button>`;
   }
 }
 // Yedek: sunucu çalışmazsa notlar WhatsApp / mail ile gönderilebilecek metin olur

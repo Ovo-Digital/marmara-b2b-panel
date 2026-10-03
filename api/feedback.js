@@ -26,6 +26,11 @@ const clean = (s = "", max = 2000) => String(s).replace(/@/g, "@​").replace(/\
 const quote = (s) => clean(s).split("\n").map((l) => "> " + l).join("\n");
 
 module.exports = async (req, res) => {
+  // Lokal dosyadan (file://) veya başka adresten açılan panel de gönderebilsin
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Sadece POST" });
   const token = process.env.GITHUB_TOKEN;
   if (!token) return res.status(503).json({ error: "Sunucuda GITHUB_TOKEN tanımlı değil" });
