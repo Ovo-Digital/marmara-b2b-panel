@@ -1061,7 +1061,7 @@ CUST.dashboard = () => {
 CUST.products = () => {
   const f = state.filter;
   const brands = [...new Set(PRODUCTS.map((p) => p.brand))], cats = [...new Set(PRODUCTS.map((p) => p.cat))];
-  const list = PRODUCTS.filter((p) => (f.brand === "all" || p.brand === f.brand) && (f.cat === "all" || p.cat === f.cat) && (!f.q || (p.name + p.sku).toLowerCase().includes(f.q.toLowerCase())));
+  const list = PRODUCTS.filter((p) => (f.brand === "all" || p.brand === f.brand) && (f.cat === "all" || p.cat === f.cat) && (!f.q || srchHit(prodText(p), f.q)));
   return `${head("Products / New Order", "")}
   <div class="filters" style="margin-bottom:18px">
     <select onchange="state.filter.brand=this.value;rerender()"><option value="all">All brands</option>${brands.map((b) => `<option value="${b}" ${f.brand === b ? "selected" : ""}>${b}</option>`).join("")}</select>
@@ -1289,10 +1289,60 @@ function reportProblem(no) {
   <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn danger" onclick="O('${no}').problem=true;closeModal();toast('Problem bildirildi · Ferhat + Operasyon bilgilendirildi','alert');rerender()">Bildir</button></div>`);
 }
 
+// ——— Üst arama: ürün / müşteri / sipariş, Türkçe kelimelerle ———
+const CAT_TR = {
+  Cologne: "kolonya kolonyası parfüm koku", Fragrance: "parfüm parfum edp koku", "Hair Styling": "wax vaks şekillendirici jöle sprey saç",
+  "Hair Care": "şampuan sampuan saç bakım krem fön suyu", Shaving: "tıraş tiras jeli jel", Beard: "sakal yağı yag bakım",
+  Accessories: "aksesuar boyun bandı penuar önlük",
+};
+const srchNorm = (s) => String(s).toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
+const srchHit = (text, q) => srchNorm(q).split(/\s+/).filter(Boolean).every((w) => srchNorm(text).split(/[^a-z0-9]+/).some((t) => t.startsWith(w)) || srchNorm(text).includes(w));
+const prodText = (p) => `${p.name} ${p.sku} ${p.brand} ${p.cat} ${CAT_TR[p.cat] || ""} ${p.ean}`;
+let srchIdx = 0;
+function srchResults(q) {
+  const mode = state.mode, out = [];
+  PRODUCTS.filter((p) => srchHit(prodText(p), q)).slice(0, 6).forEach((p) => out.push({ g: "Ürünler", html: `${thumb(p)}<div><b>${p.name}</b><small class="mono">${p.sku} · ${p.cat}</small></div>`, go: mode === "admin" ? `admin/product/${p.sku}` : mode === "customer" ? "customer/products" : null, q: p.sku }));
+  if (mode === "admin") CUSTOMERS.filter((c) => srchHit(`${c.name} ${c.country} ${c.city} ${c.id} ${c.contact}`, q)).slice(0, 4).forEach((c) => out.push({ g: "Müşteriler", html: `<span class="srch-ic">${c.flag}</span><div><b>${c.name}</b><small>${c.country} · ${c.id}</small></div>`, go: `admin/${c.status === "Pending" ? "application" : "customer"}/${c.id}` }));
+  ORDERS.filter((o) => (mode !== "customer" || o.cust === ME) && (mode !== "factory" || o.stage >= 3) && srchHit(`${o.no} ${C(o.cust).name} ${o.items.map(([s]) => s).join(" ")}`, q)).slice(0, 4).forEach((o) =>
+    out.push({ g: "Siparişler", html: `<span class="srch-ic">${ic("cart")}</span><div><b class="mono">${o.no}</b><small>${C(o.cust).name} · ${STAGES[o.stage]}</small></div>`, go: mode === "factory" ? `factory/prep/${o.no}` : `${mode}/order/${o.no}` }));
+  return out.filter((r) => r.go);
+}
+function srchRender() {
+  const inp = $(".top .search input"), box = $("#srchBox"), q = inp.value.trim();
+  if (!q) { box.classList.remove("open"); return; }
+  const res = srchResults(q);
+  srchIdx = Math.min(srchIdx, Math.max(0, res.length - 1));
+  let g = "";
+  box.innerHTML = res.length ? res.map((r, i) => `${r.g !== g ? `<div class="srch-g">${(g = r.g)}</div>` : ""}<a class="srch-row ${i === srchIdx ? "on" : ""}" data-i="${i}" onmousedown="event.preventDefault();srchGo(${i})">${r.html}</a>`).join("") : `<div class="srch-none">Sonuç yok</div>`;
+  box._res = res;
+  box.classList.add("open");
+}
+function srchGo(i) {
+  const r = $("#srchBox")._res?.[i]; if (!r) return;
+  if (r.q && r.go === "customer/products") state.filter.q = r.q;
+  const inp = $(".top .search input"); inp.value = ""; inp.blur(); $("#srchBox").classList.remove("open");
+  go(r.go);
+}
+function srchMount() {
+  const wrap = $(".top .search"), inp = wrap.querySelector("input");
+  wrap.insertAdjacentHTML("beforeend", `<div class="srch-box" id="srchBox"></div>`);
+  inp.addEventListener("input", () => { srchIdx = 0; srchRender(); });
+  inp.addEventListener("focus", srchRender);
+  inp.addEventListener("blur", () => setTimeout(() => $("#srchBox").classList.remove("open"), 120));
+  inp.addEventListener("keydown", (e) => {
+    const n = $("#srchBox")._res?.length || 0;
+    if (e.key === "ArrowDown") { e.preventDefault(); srchIdx = (srchIdx + 1) % Math.max(1, n); srchRender(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); srchIdx = (srchIdx - 1 + n) % Math.max(1, n); srchRender(); }
+    else if (e.key === "Enter") { e.preventDefault(); srchGo(srchIdx); }
+    else if (e.key === "Escape") { inp.blur(); }
+  });
+}
+
 // ——— başlat ———
 document.querySelectorAll("[data-i]").forEach((el) => (el.outerHTML = ic(el.dataset.i)));
 $("#collapse").innerHTML = ic("chevL");
 $("#burger").innerHTML = ic("menu");
+srchMount();
 $("#collapse").onclick = () => { $("#app").classList.toggle("mini"); $("#collapse").innerHTML = ic($("#app").classList.contains("mini") ? "chevR" : "chevL"); };
 $("#burger").onclick = () => $("#app").classList.toggle("nav-open");
 $("#notifBtn").onclick = () => go("admin/notifications");

@@ -886,6 +886,7 @@ const I18N = {
   "Son giriş": {"tr":"Son giriş","en":"Last login","es":"Último acceso","de":"Letzte Anmeldung","ru":"Последний вход"},
   "Son palet": {"tr":"Son palet","en":"Last pallet","es":"Último palé","de":"Letzte Palette","ru":"Последняя паллета"},
   "Son sipariş": {"tr":"Son sipariş","en":"Last order","es":"Último pedido","de":"Letzte Bestellung","ru":"Последний заказ"},
+  "Sonuç yok": {"tr":"Sonuç yok","en":"No results","es":"Sin resultados","de":"Keine Ergebnisse","ru":"Ничего не найдено"},
   "Sorabileceğimiz örnekler": {"tr":"Sorabileceğimiz örnekler","en":"Example questions","es":"Preguntas de ejemplo","de":"Beispielfragen","ru":"Примеры вопросов"},
   "Soru cevapları": {"tr":"Soru cevapları","en":"Answers","es":"Respuestas","de":"Antworten","ru":"Ответы"},
   "Sorular #/#": {"tr":"Sorular #/#","en":"Questions #/#","es":"Preguntas #/#","de":"Fragen #/#","ru":"Вопросы #/#"},
