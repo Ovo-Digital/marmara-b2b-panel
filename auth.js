@@ -15,14 +15,10 @@ let authView = "login";
 const authGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const authSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const authSession = () => authGet(AUTH_KEY, null);
-const authRegs = () => authGet(REGS_KEY, []);
+const authRegs = () => STORE.regs;   // başvurular ortak depoda (şifreler SHA-256 özetiyle)
+const authHash = async (u, p) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(u + ":" + p)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-// Bu tarayıcıda kayıt olan müşteriler listeye eklenir (onay durumu ve seviye korunur)
-authRegs().forEach((r) => { if (!CUSTOMERS.some((c) => c.id === r.cust.id)) CUSTOMERS.push(r.cust); });
-function authSyncCustomer(c) {
-  const regs = authRegs(), r = regs.find((x) => x.cust.id === c.id);
-  if (r) { r.cust = { ...c }; authSet(REGS_KEY, regs); }
-}
+function authSyncCustomer() {}   // müşteri kaydı artık ortak depoyla eşitleniyor
 
 function authGuard() {
   const s = authSession();
@@ -36,14 +32,17 @@ function authGuard() {
   return true;
 }
 
-function authLogin() {
+async function authLogin() {
   const u = $("#auU").value.trim().toLocaleLowerCase("tr"), p = $("#auP").value;
   const err = (m) => { $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
+  await STORE.ready;
   const acc = ACCOUNTS.find((a) => a.u === u && a.p === p);
-  const reg = authRegs().find((r) => r.u === u && r.p === p);
+  const h = await authHash(u, p);
+  const reg = authRegs().find((r) => r.u === u && r.h === h);
   if (!acc && !reg) return err("Kullanıcı adı veya şifre hatalı");
   if (reg) {
-    const c = C(reg.cust.id) || reg.cust;
+    const c = C(reg.cust);
+    if (!c) return err("Kullanıcı adı veya şifre hatalı");
     if (c.status !== "Active") return err("Hesabınız onay bekliyor. Onaylanınca giriş yapabilirsiniz.");
     authSet(AUTH_KEY, { u, role: "customer", cust: c.id, name: c.contact, title: c.name });
   } else authSet(AUTH_KEY, { u: acc.u, role: acc.role, cust: acc.cust, name: acc.name, title: acc.title, dash: acc.dash });
@@ -104,6 +103,14 @@ function authRender() {
         <div class="field span2"><label>Interested brands</label><div class="checks">${["Barber Marmara", "Marmara", "Noir"].map((b) => `<label><input type="checkbox" class="rgBrand" value="${b}" checked>${b}</label>`).join("")}</div></div>
         ${f("Password", "rgPw", "password", 1)}${f("Confirm password", "rgPw2", "password", 1)}
       </div>
+      <div class="consents notranslate">${(LANG === "tr" ? [
+        `<a onclick="event.preventDefault();legalOpen('kvkk')">KVKK Aydınlatma Metni</a>’ni ve <a onclick="event.preventDefault();legalOpen('privacy')">Gizlilik Politikası</a>’nı okudum. *`,
+        `<a onclick="event.preventDefault();legalOpen('terms')">Kullanım Koşulları</a>’nı kabul ediyorum. *`,
+        `Kampanya ve ürün duyurularını almak için <a onclick="event.preventDefault();legalOpen('consent')">Açık Rıza Metni</a> kapsamında onay veriyorum. (isteğe bağlı)`] : [
+        `I have read the <a onclick="event.preventDefault();legalOpen('kvkk')">Data Protection Notice</a> and the <a onclick="event.preventDefault();legalOpen('privacy')">Privacy Policy</a>. *`,
+        `I accept the <a onclick="event.preventDefault();legalOpen('terms')">Terms of Use</a>. *`,
+        `I agree to receive campaign and product announcements under the <a onclick="event.preventDefault();legalOpen('consent')">Explicit Consent</a> text. (optional)`]).map((t, i) => `<label><input type="checkbox" id="${["cKvkk", "cTerms", "cMkt"][i]}"><span>${t}</span></label>`).join("")}
+      </div>
       <div class="auth-err" id="auErr"></div>
       <button class="btn primary block lg mt" onclick="authRegister()">Başvuruyu gönder</button>
     </div>`;
@@ -115,7 +122,7 @@ function authRender() {
       <div class="notice info mt">${ic("info")}<span>Hesabınız onay bekliyor. Ekibimiz onayladığında aynı e-posta ve şifreyle giriş yapabilirsiniz.</span></div>
       <button class="btn primary block lg mt" onclick="authView='login';authRender()">Giriş ekranına dön</button>
     </div>`;
-  box.innerHTML = `<div class="auth">${brand}<div class="auth-main">${authLangs()}${card}</div></div>`;
+  box.innerHTML = `<div class="auth">${brand}<div class="auth-main">${authLangs()}${card}${legalLinks()}</div></div>`;
   setTimeout(() => $("#auU")?.focus(), 30);
 }
 
@@ -123,20 +130,24 @@ function authWeb(yes) {
   $("#rgWebY").classList.toggle("on", yes); $("#rgWebN").classList.toggle("on", !yes);
   $("#rgWebBox").style.display = yes ? "" : "none"; if (yes) $("#rgWeb").focus();
 }
-function authRegister() {
+async function authRegister() {
   const v = (id) => $("#" + id).value.trim();
   const err = (m) => { $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
   if (!v("rgName") || !v("rgVat") || !v("rgContact") || !v("rgEmail") || !v("rgPw")) return err("Please fill all required fields");
   if (v("rgPw") !== v("rgPw2")) return err("Passwords do not match");
+  if (!$("#cKvkk").checked || !$("#cTerms").checked) return err("Devam etmek için Aydınlatma Metni ve Kullanım Koşulları onayı gerekli");
   const hasWeb = $("#rgWebY").classList.contains("on");
   if (hasWeb && !/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/.test(v("rgWeb"))) return err("Geçerli bir web sitesi adresi girin");
   const email = v("rgEmail").toLocaleLowerCase("tr");
+  await STORE.ready;
   if (authRegs().some((r) => r.u === email) || ACCOUNTS.some((a) => a.u === email)) return err("Bu e-posta ile zaten bir başvuru var");
   const country = v("rgCountry");
   const flags = { Germany: "🇩🇪", France: "🇫🇷", Sweden: "🇸🇪", USA: "🇺🇸", UAE: "🇦🇪", "Saudi Arabia": "🇸🇦", Lithuania: "🇱🇹", Romania: "🇷🇴" };
-  const cust = { id: "A-0" + (100 + CUSTOMERS.length), name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", type: v("rgType"), sales: "", level: 1, currency: "USD", payment: "", incoterm: "", status: "Pending", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
-    contact: v("rgContact"), email, vat: v("rgVat"), brands: [...document.querySelectorAll(".rgBrand:checked")].map((b) => b.value).join(" / "), applied: fmtDate(new Date()), phone: v("rgPhone") || "—", position: v("rgPos") || "—", website: hasWeb ? v("rgWeb") : "Yok", instagram: v("rgIg").replace(/^@?/, v("rgIg") ? "@" : "") || "—" };
+  const cust = { id: "A-" + Date.now().toString(36).toUpperCase(), name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", type: v("rgType"), sales: "", level: 1, currency: "USD", payment: "", incoterm: "", status: "Pending", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
+    contact: v("rgContact"), email, vat: v("rgVat"), brands: [...document.querySelectorAll(".rgBrand:checked")].map((b) => b.value).join(" / "), applied: fmtDate(new Date()), phone: v("rgPhone") || "—", position: v("rgPos") || "—", website: hasWeb ? v("rgWeb") : "Yok", instagram: v("rgIg").replace(/^@?/, v("rgIg") ? "@" : "") || "—",
+    consents: { version: LEGAL_VERSION, kvkk: new Date().toISOString(), terms: new Date().toISOString(), marketing: $("#cMkt").checked ? new Date().toISOString() : null } };
   CUSTOMERS.push(cust);
-  authSet(REGS_KEY, [...authRegs(), { u: email, p: v("rgPw"), cust }]);
+  STORE.regs.push({ u: email, h: await authHash(email, v("rgPw")), cust: cust.id, at: new Date().toISOString() });
+  await storeSync();
   authView = "done"; authRender();
 }

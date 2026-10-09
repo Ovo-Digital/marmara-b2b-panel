@@ -295,10 +295,11 @@ function render() {
   const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode];
   const fn = views[page] || views[Object.keys(views)[0]];
   $("#view").innerHTML = fn(arg);
+  storeQueue();
   $("#app").classList.remove("nav-open");
   window.scrollTo(0, 0);
 }
-function rerender() { const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); window.scrollTo(0, y); }
+function rerender() { if (!authSession()) return; const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); window.scrollTo(0, y); storeQueue(); }
 
 // ——— modal & toast ———
 function modal(html) { $("#modalBox").innerHTML = html; $("#modal").classList.add("on"); }
@@ -553,7 +554,7 @@ ADMIN.application = (id) => {
   return `${head(`Başvuru — ${c.name}`, "", `<button class="btn warn" onclick="toast('Ek bilgi talebi ${c.email} adresine gönderildi','send')">Bilgi İste</button><button class="btn danger" onclick="toast('Başvuru reddedildi','x')">Reddet</button><button class="btn ok" onclick="approveCustomer('${id}')">${ic("check")} Onayla</button>`, `<a href="#/admin/customers">Müşteriler</a> / Başvuru ${c.id}`)}
   <div class="grid g2">
     <div class="card"><div class="card-h"><h3>Başvuru Bilgileri</h3><span class="pill gold">Onay Bekliyor · ${c.applied}</span></div>
-      <dl class="dl"><dt>Firma</dt><dd>${c.name}</dd><dt>Ülke / Şehir</dt><dd>${c.flag} ${c.country} · ${c.city}</dd><dt>Firma tipi</dt><dd>${c.type}</dd><dt>VAT</dt><dd class="mono">${c.vat}</dd><dt>Web sitesi</dt><dd>${c.website}</dd><dt>Instagram</dt><dd>${c.instagram || "—"}</dd>
+      <dl class="dl"><dt>Firma</dt><dd>${c.name}</dd><dt>Ülke / Şehir</dt><dd>${c.flag} ${c.country} · ${c.city}</dd><dt>Firma tipi</dt><dd>${c.type}</dd><dt>VAT</dt><dd class="mono">${c.vat}</dd><dt>Web sitesi</dt><dd>${c.website}</dd><dt>Instagram</dt><dd>${c.instagram || "—"}</dd><dt>Yasal onaylar</dt><dd>${c.consents ? `KVKK ✓ · Koşullar ✓ · Pazarlama ${c.consents.marketing ? "✓" : "✗"} <small class="muted">(v${c.consents.version} · ${fmtDate(c.consents.kvkk)})</small>` : '<span class="muted">Demo kayıt</span>'}</dd>
       <dt>İletişim</dt><dd>${c.contact} · ${c.position}</dd><dt>E-posta</dt><dd>${c.email}</dd><dt>WhatsApp / Tel</dt><dd>${c.phone}</dd><dt>İlgilendiği markalar</dt><dd>${c.brands}</dd></dl>
       <div class="notice info mt">${ic("info")}<span>Onaylanana kadar müşteri portalda fiyat ve stok göremez; sadece "Pending Approval" ekranını görür.</span></div>
     </div>
@@ -1174,9 +1175,9 @@ CUST.checkout = () => {
   </div></div></div>`;
 };
 function placeOrder() {
-  const no = "SO-2026-0" + (149 + ORDERS.length - 8);
-  ORDERS.unshift({ no, cust: ME, date: "30 Sep 2026", currency: "USD", target: state.cartTarget, stage: 0, paid: 0, reserveUntil: "", problem: false, items: cartItems().map(([s, b]) => [s, b]), note: $("#ckNote")?.value.trim() || "", po: $("#ckPo")?.value.trim() || "" });
-  state.logs[no] = [["30 Sep 2026", "ABC Distribution siparişi portaldan oluşturdu"]];
+  const no = "SO-2026-" + String(Math.max(148, ...ORDERS.map((o) => +o.no.slice(-4))) + 1).padStart(4, "0");
+  ORDERS.unshift({ no, cust: ME, date: fmtDate(new Date()), currency: levelCur(levelOf(ME)), created: new Date().toISOString(), target: state.cartTarget, stage: 0, paid: 0, reserveUntil: "", problem: false, items: cartItems().map(([s, b]) => [s, b]), note: $("#ckNote")?.value.trim() || "", po: $("#ckPo")?.value.trim() || "" });
+  state.logs[no] = [[new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", ""), `${C(ME).name} siparişi portaldan oluşturdu`]];
   state.cart = {};
   toast(`Order ${no} submitted · your sales rep Ferhat has been notified`);
   go("customer/order/" + no);
@@ -1213,6 +1214,7 @@ CUST.marketing = () => `${head("Marketing Hub", "", `<button class="btn gold" on
 CUST.account = () => { const c = C(ME); return `${head("Account", c.name)}
   <div class="grid g2"><div class="card"><div class="card-h"><h3>Company</h3></div><dl class="dl"><dt>Company</dt><dd>${c.name}</dd><dt>Country</dt><dd>${c.flag} ${c.country}</dd><dt>VAT</dt><dd class="mono">${c.vat}</dd><dt>Payment term</dt><dd>${c.payment}</dd><dt>Shipping term</dt><dd>${c.incoterm}</dd><dt>Your sales rep</dt><dd>${c.sales} · ferhat@marmarabarber.com</dd></dl></div>
   <div class="card"><div class="card-h"><h3>Addresses</h3><button class="btn sm">${ic("plus")} Add</button></div><div class="stat-row"><span style="color:var(--text)">Berlin Warehouse</span><small class="muted">Default</small></div><div class="stat-row"><span style="color:var(--text)">Hamburg Hub</span><small></small></div>
+  <div class="card-h mt"><h3>Legal</h3></div>${["kvkk", "privacy", "consent", "cookies", "terms"].map((k) => `<div class="stat-row notranslate"><a class="strong" onclick="legalOpen('${k}')">${LEGAL[k].title[LANG === "tr" ? "tr" : "en"]}</a><span class="muted">v${LEGAL_VERSION}</span></div>`).join("")}
   <div class="card-h mt"><h3>Users</h3><button class="btn sm">${ic("plus")} Invite</button></div><div class="stat-row"><span style="color:var(--text)">John Smith</span><small class="muted">Admin</small></div><div class="stat-row"><span style="color:var(--text)">Lena Fischer</span><small class="muted">Orders</small></div></div></div>`; };
 
 // ═════════════════════════════ FABRİKA ═════════════════════════════
@@ -1334,6 +1336,8 @@ $("#collapse").innerHTML = ic("chevL");
 $("#burger").innerHTML = ic("menu");
 $("#logoutBtn").innerHTML = ic("logout");
 $("#logoutBtn").onclick = authLogout;
+cookieNotice();
+STORE.ready = storeInit().then(() => { if (authSession()) rerender(); });
 srchMount();
 $("#collapse").onclick = () => { $("#app").classList.toggle("mini"); $("#collapse").innerHTML = ic($("#app").classList.contains("mini") ? "chevR" : "chevL"); };
 $("#burger").onclick = () => $("#app").classList.toggle("nav-open");
