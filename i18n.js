@@ -60,6 +60,7 @@ function setLang(l) {
   if (typeof rerender === "function" && document.querySelector("#view .notranslate")) rerender();   // dil biçimli tarihler yeniden çizilsin
   i18nTree(document.body);
   i18nMenu();
+  if (document.body.classList.contains("auth-on") && typeof authRender === "function") authRender();
   i18nWatch();
 }
 function i18nMenu() {

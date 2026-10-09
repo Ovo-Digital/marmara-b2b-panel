@@ -1,0 +1,17 @@
+Fiyat tablosundaki barkod, ürün listesinde BAŞKA bir ürüne tanımlı (kaynak verisi düzeltilmeli):
+
+8691541000813  fiyat tablosu: BARBER COLOGNE 50 ML NO.2 SPRAY
+               ürün listesi:  BARBER FADE BRUSH S  [BFB-S]
+
+8691541001124  fiyat tablosu: BARBER AFTER SHAVE COLOGNE 400 ML NO.62
+               ürün listesi:  BARBER COLOGNE 250 ML NO.2 SPRAY  [BC-250-2-S]
+
+8691541007775  fiyat tablosu: PUSAT
+               ürün listesi:  BARBER APRON SHIELD CHEST HOLDER  [BA-SHI]
+
+8691541000479  fiyat tablosu: BARBER BLACK BAG
+               ürün listesi:  BARBER STAND  [BSTND]
+
+8691541000479  fiyat tablosu: BARBER BAG
+               ürün listesi:  BARBER STAND  [BSTND]
+

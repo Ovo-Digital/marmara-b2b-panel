@@ -39,6 +39,7 @@ const ICONS = {
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   bank: '<path d="M3 21h18M3 10h18M5 6l7-3 7 3"/><path d="M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
 };
 const ic = (n, cls = "") => `<svg class="ic ${cls}" viewBox="0 0 24 24">${ICONS[n] || ""}</svg>`;
@@ -59,12 +60,21 @@ const sym = (c) => (c === "EUR" ? "€" : "$");
 const fx = (c) => (c === "EUR" ? 0.92 : 1);
 const money = (v, c = "USD", d = 0) => sym(c) + Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const num = (v) => Number(v).toLocaleString("en-US");
-const unitPrice = (p, c = "USD") => p.price * fx(c);
-const lineTotal = (sku, boxes, c = "USD", price) => { const p = P(sku); return boxes * p.pcsBox * (price ?? unitPrice(p, c)); };
-const orderTotal = (o) => o.items.reduce((s, [sku, b, pr]) => s + lineTotal(sku, b, o.currency, pr), 0);
+// Fiyat seviyesi: müşteriye admin atar (yeni kayıt → Level 1). Sipariş, müşterinin seviyesini alır; admin sipariş özelinde değiştirebilir.
+const levelOf = (custId) => C(custId)?.level || 1;
+const orderLevel = (o) => o.level ?? levelOf(o.cust);
+const levelCur = (lvl) => LEVELS[lvl - 1]?.cur || "USD";
+const priceAt = (p, lvl) => p.prices[lvl - 1] ?? p.price;
+const orderPrice = (o, p) => priceAt(p, orderLevel(o));
+const custPrice = (p) => priceAt(p, levelOf(ME));
+const syncOrder = (o) => { o.currency = levelCur(orderLevel(o)); };
+const lineTotal = (sku, boxes, lvl = levelOf(ME), price) => { const p = P(sku); return boxes * p.pcsBox * (price ?? priceAt(p, lvl)); };
+const orderTotal = (o) => o.items.reduce((s, [sku, b, pr]) => s + lineTotal(sku, b, orderLevel(o), pr), 0);
 const orderBoxes = (items) => items.reduce((s, [, b]) => s + b, 0);
 const targetLabel = (t) => (t === "pallet" ? "Palet" : SETTINGS.containers[t].label);
-const thumb = (p) => `<div class="thumb"><img src="img/${p.img}" alt=""></div>`;
+const imgSrc = (x) => (!x ? "" : x.includes("/") ? x : "img/" + x);
+const noImg = (p) => `<span class="no-img">${(p.brand || "?").split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>`;
+const thumb = (p) => `<div class="thumb">${p.img ? `<img src="${imgSrc(p.img)}" alt="" loading="lazy">` : noImg(p)}</div>`;
 const stagePill = (s, en) => {
   const cls = ["gold", "warn", "info", "info", "ok", "plain"][s];
   return `<span class="pill ${cls}">${(en ? STAGES_EN : STAGES)[s]}</span>`;
@@ -87,7 +97,7 @@ const REGION = { Germany: "Avrupa", Lithuania: "Avrupa", Romania: "Avrupa", Swed
 const pxVariant = (p) => (p.name.match(/\d+\s?(ml|g)|\(.*\)/i) || ["—"])[0];
 const pxFlash = (p) => (p.dg.includes("Class 3") ? (p.cat === "Fragrance" ? "24 °C" : "23 °C") : p.dg.includes("Aerosol") ? "< 0 °C" : "—");
 const pxImdg = (p) => (p.dg.includes("Class 3") ? "Class 3" : p.dg.includes("Aerosol") ? "Class 2.1" : "—");
-const pxOrient = (p) => (["Cologne", "Fragrance", "Shaving", "Hair Care", "Beard"].includes(p.cat) || p.sku === "SS-200" || p.sku === "MS-750" ? "Dik (↑)" : "Serbest");
+const pxOrient = (p) => (["Cologne", "Fragrance", "Shaving", "Hair Care", "Beard"].includes(p.cat) || p.sku === "BSS-200 - PS" || p.sku === "BHS-750-M" ? "Dik (↑)" : "Serbest");
 const pxStack = (p) => (p.cls === "Fragile" ? "Max 3 kat" : p.cls === "Heavy" ? "Evet · altta" : "Evet");
 
 // ——— Palet & konteyner motoru (demo sadeleştirmesi) ———
@@ -171,21 +181,21 @@ function suggestions(items, target) {
       return { p, boxes, fits: boxes <= availBoxes(p) && !after.over, inCart: inCart.has(p.sku), after };
     })
     .filter((s) => s.fits && s.boxes > 0)
-    .sort((a, b) => (b.inCart - a.inCart) || (a.boxes * a.p.pcsBox * a.p.price - b.boxes * b.p.pcsBox * b.p.price))
+    .sort((a, b) => (b.inCart - a.inCart) || (a.boxes * a.p.pcsBox * custPrice(a.p) - b.boxes * b.p.pcsBox * custPrice(b.p)))
     .slice(0, 4);
 }
 
 // ——— durum ———
 const state = {
   mode: "admin",
-  cart: { "BC-400-02": 24, "SG-77": 20, "KS-1150": 16, "MW-150": 30, "PW-20": 20, "SS-200": 10 },
+  cart: { "BC-400-2": 24, "BSG-1000-77": 20, "BS-1150-KRT": 16, "BW-150-MAT-1018": 30, "BW-20-SKL": 20, "BSS-200 - PS": 10 },
   cartTarget: "pallet",
   filter: { orders: -1, customers: "all", brand: "all", cat: "all", q: "" },
   loadingOrder: "SO-2026-0148",
   loadingTarget: null,
   prep: {
-    "SO-2026-0145": { "PW-20": 86, "SS-200": 64, "BC-400-02": 101, "GAW-150": 342, "SG-77": 257, "HT-500": 214 },
-    "SO-2026-0141": { "BC-400-06": 241, "MW-150": 321, "GAW-150": 120, "MS-750": 0, "ED-50": 0 },
+    "SO-2026-0145": { "BW-20-SKL": 86, "BSS-200 - PS": 64, "BC-400-2": 101, "BW-150-GUM": 342, "BSG-1000-77": 257, "BM-011277": 214 },
+    "SO-2026-0141": { "BC-400-6": 241, "BW-150-MAT-1018": 321, "BW-150-GUM": 120, "BHS-750-M": 0, "BM-007058": 0 },
   },
   logs: {
     "SO-2026-0148": [["28 Sep 2026 14:12", "ABC Distribution siparişi oluşturdu (20' konteyner — COMPLETE)"], ["28 Sep 2026 14:12", "Sistem: stok, fiyat ve konteyner doğrulaması geçti"], ["28 Sep 2026 14:13", "Bildirim: Ferhat'a yeni sipariş maili gönderildi"]],
@@ -243,7 +253,6 @@ const NAV = {
     ["marketing", "Marketing", "image"],
     ["Settings"],
     ["account", "Account", "user"],
-    ["register", "Sign up", "edit"],
   ],
   factory: [
     ["Fabrika"],
@@ -262,10 +271,14 @@ function parse() {
 }
 
 function render() {
+  if (!authGuard()) return;
   const { mode, page, arg } = parse();
   state.mode = mode;
   document.querySelectorAll("#modeSwitch button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
-  const [ini, name, role] = USERS_BY_MODE[mode];
+  let [ini, name, role] = USERS_BY_MODE[mode];
+  const sess = authSession();
+  if (sess && sess.role === mode) { name = sess.name; role = sess.title; ini = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(); }
+  $("#modeSwitch").style.display = sess?.role === "admin" ? "" : "none";
   $("#avatar").textContent = ini; $("#meName").textContent = name; $("#meRole").textContent = role;
   $("#sideTag").textContent = mode === "customer" ? "B2B CUSTOMER PORTAL" : mode === "factory" ? "FACTORY · DÜZCE" : "B2B BACK OFFICE";
   $("#notifBtn").style.display = mode === "admin" ? "" : "none";
@@ -502,8 +515,8 @@ ADMIN.notifications = () => {
     ["err", "cart", "SO-2026-0148 satış incelemesi bekliyor", "ABC Distribution · $52,818 · 20' DC · Sorumlu: Ferhat", "admin/order/SO-2026-0148", "İncele"],
     ["err", "shield", "SO-2026-0147 final onay bekliyor", "Barber Supply Co. · 40' HC · Onaylayan: Gözde", "admin/order/SO-2026-0147", "Onayla"],
     ["warn", "clock", "Rezervasyon bugün doluyor — SO-2026-0145", "Otomatik release yok. Extend veya Release seçilmeli.", "admin/products/res", "Karar ver"],
-    ["err", "factory", "Hazırlık problemi — SO-2026-0145", "BC-400-02: 103 koli gerekli, 101 bulundu (2 eksik)", "factory/prep/SO-2026-0145", "Aç"],
-    ["err", "factory", "Hazırlık gecikmesi — SO-2026-0141", "MS-750 ve ED-50 henüz hazırlanmadı", "factory/prep/SO-2026-0141", "Aç"],
+    ["err", "factory", "Hazırlık problemi — SO-2026-0145", "BC-400-2: 103 koli gerekli, 101 bulundu (2 eksik)", "factory/prep/SO-2026-0145", "Aç"],
+    ["err", "factory", "Hazırlık gecikmesi — SO-2026-0141", "BHS-750-M ve BM-007058 henüz hazırlanmadı", "factory/prep/SO-2026-0141", "Aç"],
     ["warn", "trend", "3 müşteri Ekim forecast girmedi", "Baltic Grooming, Riyadh Grooming, Kazakh Style", "admin/forecast", "Hatırlat"],
     ["warn", "file", "Free Sales Certificate 14 Ekim'de doluyor", "Tüm müşterilere görünür doküman", "admin/documents", "Güncelle"],
     ["gold", "users", "2 yeni B2B başvurusu", "Nordic Cuts AB (SE), Maison du Barbier (FR)", "admin/customers", "İncele"],
@@ -526,9 +539,9 @@ ADMIN.customers = () => {
   const chip = (k, l) => `<button class="chip ${f === k ? "on" : ""}" onclick="state.filter.customers='${k}';rerender()">${l}</button>`;
   return `${head("Müşteriler", "", `<button class="btn">${ic("download")} Excel</button><button class="btn gold">${ic("plus")} Müşteri Ekle</button>`)}
   <div class="filters" style="margin-bottom:16px">${chip("all", "Tümü")}${chip("pending", `Onay Bekleyen (${CUSTOMERS.filter((c) => c.status === "Pending").length})`)}${chip("active", "Aktif")}${chip("inactive", "Pasif")}</div>
-  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Firma</th><th>Ülke</th><th>Tip</th><th>Satış Sorumlusu</th><th>Fiyat Listesi</th><th class="r">YTD Satış</th><th>Son Sipariş</th><th>Durum</th></tr></thead><tbody>
+  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Firma</th><th>Ülke</th><th>Tip</th><th>Satış Sorumlusu</th><th>Fiyat Seviyesi</th><th class="r">YTD Satış</th><th>Son Sipariş</th><th>Durum</th></tr></thead><tbody>
   ${list.map((c) => `<tr class="click" onclick="go('admin/${c.status === "Pending" ? "application" : "customer"}/${c.id}')">
-    <td><b>${c.name}</b><br><small class="dim mono">${c.id}</small></td><td>${c.flag} ${c.country}</td><td class="muted">${c.type}</td><td>${c.sales || '<span class="dim">— atanmadı</span>'}</td><td>${c.list || '<span class="dim">—</span>'}</td>
+    <td><b>${c.name}</b><br><small class="dim mono">${c.id}</small></td><td>${c.flag} ${c.country}</td><td class="muted">${c.type}</td><td>${c.sales || '<span class="dim">— atanmadı</span>'}</td><td>${c.status === "Pending" ? '<span class="dim">—</span>' : `Level ${levelOf(c.id)}`}</td>
     <td class="r strong">${c.ytd ? money(c.ytd) : "—"}</td><td class="muted">${c.applied ? "Başvuru: " + c.applied : c.lastOrder}</td>
     <td><span class="pill ${c.status === "Active" ? "ok" : c.status === "Pending" ? "gold" : "err"}">${c.status === "Pending" ? "Onay Bekliyor" : c.status === "Active" ? "Aktif" : "Pasif · 90 gün"}</span></td></tr>`).join("")}
   </tbody></table></div></div>`;
@@ -540,14 +553,14 @@ ADMIN.application = (id) => {
   return `${head(`Başvuru — ${c.name}`, "", `<button class="btn warn" onclick="toast('Ek bilgi talebi ${c.email} adresine gönderildi','send')">Bilgi İste</button><button class="btn danger" onclick="toast('Başvuru reddedildi','x')">Reddet</button><button class="btn ok" onclick="approveCustomer('${id}')">${ic("check")} Onayla</button>`, `<a href="#/admin/customers">Müşteriler</a> / Başvuru ${c.id}`)}
   <div class="grid g2">
     <div class="card"><div class="card-h"><h3>Başvuru Bilgileri</h3><span class="pill gold">Onay Bekliyor · ${c.applied}</span></div>
-      <dl class="dl"><dt>Firma</dt><dd>${c.name}</dd><dt>Ülke / Şehir</dt><dd>${c.flag} ${c.country} · ${c.city}</dd><dt>Firma tipi</dt><dd>${c.type}</dd><dt>VAT</dt><dd class="mono">${c.vat}</dd><dt>Web sitesi</dt><dd>${c.website}</dd>
+      <dl class="dl"><dt>Firma</dt><dd>${c.name}</dd><dt>Ülke / Şehir</dt><dd>${c.flag} ${c.country} · ${c.city}</dd><dt>Firma tipi</dt><dd>${c.type}</dd><dt>VAT</dt><dd class="mono">${c.vat}</dd><dt>Web sitesi</dt><dd>${c.website}</dd><dt>Instagram</dt><dd>${c.instagram || "—"}</dd>
       <dt>İletişim</dt><dd>${c.contact} · ${c.position}</dd><dt>E-posta</dt><dd>${c.email}</dd><dt>WhatsApp / Tel</dt><dd>${c.phone}</dd><dt>İlgilendiği markalar</dt><dd>${c.brands}</dd></dl>
       <div class="notice info mt">${ic("info")}<span>Onaylanana kadar müşteri portalda fiyat ve stok göremez; sadece "Pending Approval" ekranını görür.</span></div>
     </div>
     <div class="card"><div class="card-h"><h3>Admin Ataması</h3></div>
       <div class="form cols2">
         <div class="field"><label>Satış Sorumlusu</label><select class="input" id="apSales"><option value="">— Seçilmezse Ferhat atanır</option>${opt(["Ferhat", "Gözde"])}</select></div>
-        <div class="field"><label>Varsayılan Fiyat Listesi *</label><select class="input" id="apList"><option value="">Seçiniz…</option>${opt(Object.keys(PRICE_LISTS))}</select></div>
+        <div class="field"><label>Fiyat Seviyesi</label><select class="input" id="apList">${LEVELS.map((l) => `<option value="${l.id}" ${l.id === (c.level || 1) ? "selected" : ""}>${l.name}</option>`).join("")}</select></div>
         <div class="field span2"><label>İzinli Markalar</label><div class="checks">${["Marmara Barber", "Marmara", "Noir"].map((b) => `<label><input type="checkbox" ${c.brands.includes(b) ? "checked" : ""}>${b}</label>`).join("")}</div></div>
         <div class="field"><label>Ödeme Şartı</label><select class="input">${opt(["100% Advance", "30% Advance / 70% before loading", "LC at sight", "Net 30"])}</select></div>
         <div class="field"><label>Teslim Şartı (Incoterm)</label><select class="input">${opt(["EXW Düzce", "FOB Istanbul", "CIF", "DAP"])}</select></div>
@@ -558,10 +571,9 @@ ADMIN.application = (id) => {
   </div>`;
 };
 function approveCustomer(id) {
-  const list = $("#apList").value;
-  if (!list) { toast("Fiyat listesi seçmeden onaylanamaz", "alert"); $("#apList").focus(); return; }
-  const c = C(id);
-  Object.assign(c, { status: "Active", list, sales: $("#apSales").value || SETTINGS.defaultSales, payment: "100% Advance", incoterm: "EXW Düzce", lastOrder: "—" });
+  const c = C(id), level = Number($("#apList").value) || 1;
+  Object.assign(c, { status: "Active", level, currency: levelCur(level), sales: $("#apSales").value || SETTINGS.defaultSales, payment: "100% Advance", incoterm: "EXW Düzce", lastOrder: "—" });
+  authSyncCustomer(c);
   toast(`${c.name} onaylandı · ${c.sales} atandı · hoş geldin maili gönderildi`);
   go("admin/customer/" + id);
 }
@@ -574,7 +586,7 @@ ADMIN.customer = (id) => {
   let body = "";
   if (tab === "overview") body = `<div class="grid g2">
       <div class="card"><div class="card-h"><h3>Ticari Kurulum</h3><button class="btn sm">${ic("edit")} Düzenle</button></div>
-        <dl class="dl"><dt>Satış sorumlusu</dt><dd>${c.sales}</dd><dt>Fiyat listesi</dt><dd>${c.list}</dd><dt>Para birimi</dt><dd>${c.currency}</dd><dt>İzinli markalar</dt><dd>${c.brands}</dd><dt>Ödeme şartı</dt><dd>${c.payment}</dd><dt>Teslim şartı</dt><dd>${c.incoterm}</dd><dt>Varsayılan banka</dt><dd>${c.currency} Bank A</dd><dt>İletişim</dt><dd>${c.contact} · ${c.email}</dd></dl></div>
+        <dl class="dl"><dt>Satış sorumlusu</dt><dd>${c.sales}</dd><dt>Fiyat seviyesi</dt><dd><select class="input" style="height:34px" onchange="setCustLevel('${c.id}',this.value)">${LEVELS.map((l) => `<option value="${l.id}" ${l.id === levelOf(c.id) ? "selected" : ""}>${l.name}</option>`).join("")}</select></dd><dt>Para birimi</dt><dd>${levelCur(levelOf(c.id))}</dd><dt>İzinli markalar</dt><dd>${c.brands}</dd><dt>Ödeme şartı</dt><dd>${c.payment}</dd><dt>Teslim şartı</dt><dd>${c.incoterm}</dd><dt>Varsayılan banka</dt><dd>${c.currency} Bank A</dd><dt>İletişim</dt><dd>${c.contact} · ${c.email}</dd></dl></div>
       <div class="card flat"><div class="card-h"><h3>Müşteri Performansı</h3></div>
         <div class="grid g2"><div><div class="muted">YTD Satış</div><div class="big-num">${money(c.ytd)}</div></div><div><div class="muted">Açık Bakiye</div><div class="big-num ${c.balance ? "warn-t" : ""}">${money(c.balance, c.currency)}</div></div></div>
         <div class="divider"></div>
@@ -582,7 +594,7 @@ ADMIN.customer = (id) => {
       </div></div>
       <div class="card mt"><div class="card-h"><h3>Siparişler</h3></div>${ordersTable(orders)}</div>`;
   else if (tab === "orders") body = `<div class="card">${ordersTable(orders)}</div>`;
-  else if (tab === "pricing") body = `<div class="card"><div class="card-h"><h3>Müşteriye Özel Fiyatlar</h3><button class="btn sm gold">${ic("plus")} Özel fiyat</button></div>${pricingTable(c.list || "Europe")}</div>`;
+  else if (tab === "pricing") body = `<div class="card"><div class="card-h"><h3>Bu müşterinin fiyatları · ${LEVELS[levelOf(c.id) - 1].name}</h3></div>${pricingTable(levelOf(c.id))}</div>`;
   else if (tab === "finance") body = `<div class="card">${paymentsTable(orders)}</div>`;
   else if (tab === "forecast") body = `<div class="card"><div class="stat-row"><span>Ekim 2026</span><b>${c.forecast ? money(c.forecast) + " · High" : "Girilmedi"}</b></div><div class="stat-row"><span>Kasım 2026</span><b>$18,000 · Medium</b></div><div class="stat-row"><span>Aralık 2026</span><b>$30,000 · Low</b></div></div>`;
   else if (tab === "docs") body = `<div class="card">${docsTable(false, c)}</div>`;
@@ -619,7 +631,7 @@ ADMIN.order = (no) => {
     <button class="btn gold block mt" onclick="go('admin/finance')">${ic("wallet")} Ödeme Ekle</button>
     <button class="btn danger block mt" onclick="advance('${no}');toast('Ödemesiz serbest bırakıldı — kritik yetki, audit log’a yazıldı','shield')">Ödemesiz Serbest Bırak</button>`;
   else if (o.stage === 3) action = `<div class="card-h"><h3>Fabrikada</h3><span class="pill info">Hazırlanıyor</span></div>
-    ${o.problem ? `<div class="notice err">${ic("alert")}<span><b>Hazırlık problemi:</b> BC-400-02 için 103 koli gerekli, 101 bulundu. Müşteriye otomatik gösterilmez.</span></div>` : ""}
+    ${o.problem ? `<div class="notice err">${ic("alert")}<span><b>Hazırlık problemi:</b> BC-400-2 için 103 koli gerekli, 101 bulundu. Müşteriye otomatik gösterilmez.</span></div>` : ""}
     <div class="stat-row"><span>Rezervasyon bitişi</span><b class="${o.problem ? "err-t" : ""}">${o.reserveUntil}</b></div>
     <div class="row mt"><button class="btn sm" onclick="toast('Rezervasyon 7 gün uzatıldı')">Extend</button><button class="btn sm danger" onclick="toast('Rezervasyon serbest bırakıldı','alert')">Release</button></div>
     <button class="btn block mt" onclick="go('factory/prep/${no}')">${ic("factory")} Hazırlık ekranını aç</button>`;
@@ -633,11 +645,11 @@ ADMIN.order = (no) => {
       ${o.note || o.po ? `<div class="card note-card"><div class="card-h"><h3>${ic("edit")} Müşteri Notu</h3>${o.po ? `<span class="pill plain">PO: ${o.po}</span>` : ""}</div>${o.note ? `<p class="notranslate">${o.note.replace(/</g, "&lt;")}</p>` : ""}</div>` : ""}
       <div class="card ${o.note || o.po ? "mt" : ""}"><div class="card-h"><h3>Sipariş Kalemleri</h3></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th class="c">Koli</th><th class="r">Adet</th><th class="r">Birim</th><th class="r">Toplam</th></tr></thead><tbody>
-        ${o.items.map(([sku, b, pr], i) => { const p = P(sku), up = pr ?? unitPrice(p, o.currency), sh = o.shipped?.[sku]; return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small>${sh != null && sh < b ? ` <span class="pill warn">${sh} / ${b}</span>` : ""}</div></div></td>
+        ${o.items.map(([sku, b, pr], i) => { const p = P(sku), up = pr ?? orderPrice(o, p), sh = o.shipped?.[sku]; return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small>${sh != null && sh < b ? ` <span class="pill warn">${sh} / ${b}</span>` : ""}</div></div></td>
           <td class="c">${editable ? `<input class="input num-in" type="number" min="0" value="${b}" onchange="reviseItem('${no}',${i},this.value)">` : b}</td>
           <td class="r muted">${num(b * p.pcsBox)}</td>
-          <td class="r">${editable ? `<div class="price-in"><span>${sym(o.currency)}</span><input class="input num-in" type="number" min="0" step="0.01" value="${up.toFixed(2)}" onchange="revisePrice('${no}',${i},this.value)"></div>` : `<span class="muted">${money(up, o.currency, 2)}</span>`}${pr != null ? `<br><small class="gold-t">${money(unitPrice(p, o.currency), o.currency, 2)} liste</small>` : ""}</td>
-          <td class="r strong">${money(lineTotal(sku, b, o.currency, pr), o.currency)}</td></tr>`; }).join("")}
+          <td class="r">${editable ? `<div class="price-in"><span>${sym(o.currency)}</span><input class="input num-in" type="number" min="0" step="0.01" value="${up.toFixed(2)}" onchange="revisePrice('${no}',${i},this.value)"></div>` : `<span class="muted">${money(up, o.currency, 2)}</span>`}${pr != null ? `<br><small class="gold-t">${money(orderPrice(o, p), o.currency, 2)} liste</small>` : ""}</td>
+          <td class="r strong">${money(lineTotal(sku, b, orderLevel(o), pr), o.currency)}</td></tr>`; }).join("")}
         <tr><td colspan="4" class="r muted">Toplam · ${num(L.boxes)} koli · ${num(L.pcs)} adet</td><td class="r strong" style="font:600 18px var(--display)">${money(total, o.currency)}</td></tr>
         </tbody></table></div></div>
 
@@ -650,7 +662,7 @@ ADMIN.order = (no) => {
     <div>
       <div class="card">${action}</div>
       <div class="card mt"><div class="card-h"><h3>Ticari Şartlar</h3></div>
-        <div class="stat-row"><span>Teslim</span><b>${c.incoterm}</b></div><div class="stat-row"><span>Ödeme</span><b>${c.payment}</b></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Banka</span><b>${o.currency} Bank A</b></div><div class="stat-row"><span>Adres</span><b>${c.city} Warehouse</b></div></div>
+        <div class="stat-row"><span>Teslim</span><b>${c.incoterm}</b></div><div class="stat-row"><span>Ödeme</span><b>${c.payment}</b></div><div class="stat-row"><span>Fiyat seviyesi</span><select class="input" style="height:32px;width:auto;max-width:210px" ${o.stage >= 5 ? "disabled" : ""} onchange="setOrderLevel('${o.no}',this.value)">${LEVELS.map((l) => `<option value="${l.id}" ${l.id === orderLevel(o) ? "selected" : ""}>${l.name}</option>`).join("")}</select></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Banka</span><b>${o.currency} Bank A</b></div><div class="stat-row"><span>Adres</span><b>${c.city} Warehouse</b></div></div>
     </div>
   </div>`;
 };
@@ -671,9 +683,9 @@ function reviseItem(no, i, v) {
   rerender();
 }
 function revisePrice(no, i, v) {
-  const o = O(no), it = o.items[i], p = P(it[0]), before = it[2] ?? unitPrice(p, o.currency);
+  const o = O(no), it = o.items[i], p = P(it[0]), before = it[2] ?? orderPrice(o, p);
   const n = Math.max(0, Math.round((parseFloat(v) || 0) * 100) / 100);
-  it[2] = Math.abs(n - unitPrice(p, o.currency)) < 0.005 ? undefined : n;
+  it[2] = Math.abs(n - orderPrice(o, p)) < 0.005 ? undefined : n;
   log(no, `Admin fiyat revizesi: ${it[0]} ${money(before, o.currency, 2)} → ${money(n, o.currency, 2)}${o.stage >= 2 ? " · proforma yeni revizyon" : ""}`);
   toast(o.stage >= 2 ? "Fiyat güncellendi · proforma yeni revizyona düştü" : "Fiyat güncellendi", "refresh");
   rerender();
@@ -686,7 +698,7 @@ function docButtons(o) {
 }
 function docHtml(no, type) {
   const o = O(no), c = C(o.cust), cur = o.currency, final = type !== "pi" && o.shipped;
-  const rows = o.items.map(([sku, b, pr]) => { const p = P(sku), q = final ? o.shipped[sku] ?? b : b, up = pr ?? unitPrice(p, cur); return { p, q, up, pcs: q * p.pcsBox, net: q * p.kg * 0.86, gross: q * p.kg, cbm: (q * p.dims[0] * p.dims[1] * p.dims[2]) / 1e6 }; });
+  const rows = o.items.map(([sku, b, pr]) => { const p = P(sku), q = final ? o.shipped[sku] ?? b : b, up = pr ?? orderPrice(o, p); return { p, q, up, pcs: q * p.pcsBox, net: q * p.kg * 0.86, gross: q * p.kg, cbm: (q * p.dims[0] * p.dims[1] * p.dims[2]) / 1e6 }; });
   const L = loadCalc(rows.map((r) => [r.p.sku, r.q]), o.target);
   const sum = (f) => rows.reduce((s, r) => s + r[f], 0);
   const total = rows.reduce((s, r) => s + r.q * r.p.pcsBox * r.up, 0);
@@ -721,33 +733,38 @@ function openDoc(no, type) {
 }
 
 // ——— Fiyatlandırma ———
-function pricingTable(listName) {
-  const L = PRICE_LISTS[listName];
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th class="r">Liste Fiyatı</th><th>Müşteri Özel</th><th>Kampanya</th><th class="r">Nihai Fiyat</th><th class="r">Koli Fiyatı</th></tr></thead><tbody>
-  ${PRODUCTS.map((p) => { const base = p.price * L.factor * (L.currency === "EUR" ? 0.92 : 1); const ov = OVERRIDES.find((x) => x.sku === p.sku); const fin = ov?.price ?? (ov ? base * 0.95 : base);
-    return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td><td class="r">${money(base, L.currency, 2)}</td><td>${ov ? `<span class="gold-t">${ov.who}${ov.price ? ": " + money(ov.price, L.currency, 2) : ""}</span>` : '<span class="dim">—</span>'}</td><td>${ov?.campaign ? `<span class="pill gold plain">${ov.campaign}</span>` : '<span class="dim">—</span>'}</td><td class="r strong">${money(fin, L.currency, 2)}</td><td class="r muted">${money(fin * p.pcsBox, L.currency, 2)}</td></tr>`; }).join("")}
+function pricingTable(lvl) {
+  const list = PRODUCTS.filter((p) => (state.filter.pcat || "all") === "all" || p.cat === state.filter.pcat).filter((p) => !state.filter.pq || srchHit(prodText(p), state.filter.pq));
+  const cols = lvl ? [lvl] : LEVELS.map((l) => l.id);
+  return `<div class="tbl-wrap"><table class="tbl price-tbl"><thead><tr><th>Ürün</th><th class="r">Koli</th>${cols.map((i) => `<th class="r">${LEVELS[i - 1].name.replace(" · ", "<br><small>")}</small></th>`).join("")}</tr></thead><tbody>
+  ${list.map((p) => `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td><td class="r muted">${p.pcsBox}</td>${cols.map((i) => `<td class="r ${i === 1 ? "strong" : ""}">${p.prices[i - 1] != null ? money(p.prices[i - 1], levelCur(i), 2) : '<span class="dim">—</span>'}</td>`).join("")}</tr>`).join("")}
   </tbody></table></div>`;
 }
 ADMIN.pricing = () => {
-  const cur = state.tab.list || "Europe", L = PRICE_LISTS[cur];
-  return `${head("Fiyatlandırma", "", `<button class="btn">${ic("upload")} Excel İçe Aktar</button><button class="btn">${ic("download")} Dışa Aktar</button><button class="btn gold">${ic("plus")} Yeni Liste</button>`)}
-  <div class="card flat" style="margin-bottom:18px"><div class="filters">
-    <span class="muted">Fiyat listesi</span><select onchange="state.tab.list=this.value;rerender()">${Object.keys(PRICE_LISTS).map((k) => `<option value="${k}" ${k === cur ? "selected" : ""}>${k}</option>`).join("")}</select>
-    <span class="pill plain">Para birimi: ${L.currency}</span><span class="pill plain">Geçerlilik: ${L.effective}</span><span class="pill plain">${CUSTOMERS.filter((c) => c.list === cur).length} müşteri</span></div></div>
-  <div class="grid g-side"><div class="card">${pricingTable(cur)}</div>
-  <div><div class="card"><div class="card-h"><h3>Fiyat Önceliği</h3></div>
-    <ol style="margin:0;padding-left:18px;line-height:2"><li>Aktif müşteriye özel SKU fiyatı / kampanya</li><li>Kategori indirimi</li><li>Varsayılan fiyat listesi</li><li class="err-t">Fiyat yoksa → sipariş verilemez</li></ol>
-    <div class="notice gold mt">${ic("info")}<span>Müşteri yalnızca kendi net fiyatını görür; liste adı gösterilmez.</span></div></div>
-  <div class="card mt"><div class="card-h"><h3>Değişiklik Logu</h3></div><ul class="tl">
-    <li>PW-20 Salon Pro özel fiyat €0.95 (kampanya 01–30 Sep)<small>Gözde · 01 Sep 2026</small></li>
-    <li>Europe listesi Excel ile güncellendi (16 SKU)<small>Ferhat · 01 Sep 2026</small></li>
-    <li>BC-400-02 ABC Distribution özel fiyat €1.62<small>Ferhat · 22 Aug 2026</small></li></ul></div></div></div>`;
+  const cats = [...new Set(PRODUCTS.map((p) => p.cat))];
+  return `${head("Fiyatlandırma", `${PRODUCTS.length} ürün · ${LEVELS.length} fiyat seviyesi`, `<button class="btn">${ic("upload")} Excel İçe Aktar</button><button class="btn">${ic("download")} Dışa Aktar</button>`)}
+  <div class="level-cards">${LEVELS.map((l) => `<div class="card level-card"><small>Level ${l.id}</small><b>${l.name.split(" · ")[1]}</b><span>${CUSTOMERS.filter((c) => c.status !== "Pending" && levelOf(c.id) === l.id).length} müşteri · ${l.cur}</span></div>`).join("")}</div>
+  <div class="card flat mt" style="margin-bottom:18px"><div class="filters">
+    <select onchange="state.filter.pcat=this.value;rerender()"><option value="all">Tüm Kategoriler</option>${cats.map((c) => `<option value="${c}" ${state.filter.pcat === c ? "selected" : ""}>${c}</option>`).join("")}</select>
+    <div class="search" style="width:280px;height:38px"><span>${ic("search")}</span><input value="${state.filter.pq || ""}" placeholder="Ürün, SKU veya kelime…" onchange="state.filter.pq=this.value;rerender()"></div></div></div>
+  <div class="card">${pricingTable(0)}</div>
+  <div class="notice gold mt">${ic("info")}<span>Yeni müşteri Level 1 (liste fiyatı) ile başlar. Seviyeyi admin atar; müşteri sadece kendi fiyatını görür, seviye adını görmez.</span></div>`;
 };
+function setCustLevel(id, v) {
+  const c = C(id), l = Number(v); c.level = l; c.currency = levelCur(l); authSyncCustomer(c);
+  ORDERS.filter((o) => o.cust === id && o.level == null).forEach(syncOrder);
+  toast(`${c.name} → ${LEVELS[l - 1].name}`, "tag"); rerender();
+}
+function setOrderLevel(no, v) {
+  const o = O(no), before = orderLevel(o); o.level = Number(v); syncOrder(o);
+  log(no, `Fiyat seviyesi değişti: ${LEVELS[before - 1].name} → ${LEVELS[o.level - 1].name}${o.stage >= 2 ? " · proforma yeni revizyon" : ""}`);
+  toast(`Sipariş ${LEVELS[o.level - 1].name} ile yeniden fiyatlandı`, "refresh"); rerender();
+}
 
 // ——— Forecast ———
 ADMIN.forecast = () => {
   const fc = [["C-1021", 25000, "High", 92], ["C-1017", 48000, "High", 88], ["C-1031", 30000, "Medium", 74], ["C-1004", 12000, "High", 95], ["C-1009", 0, "", 0], ["C-1012", 0, "", 0], ["C-1002", 0, "", 0]];
-  const prod = [["PW-20", 500], ["BC-400-02", 350], ["MW-150", 420], ["SS-200", 400], ["GAW-150", 300], ["SG-77", 260], ["HG-34", 180]];
+  const prod = [["BW-20-SKL", 500], ["BC-400-2", 350], ["BW-150-MAT-1018", 420], ["BSS-200 - PS", 400], ["BW-150-GUM", 300], ["BSG-1000-77", 260], ["BHG-500-34", 180]];
   return `${head("Forecast", "", `<select class="input" style="width:160px"><option>Ekim 2026</option><option>Kasım 2026</option></select>`)}
   <div class="grid g4">${kpi("$520,000", "Beklenen Satış", "Ekim 2026", "trend")}${kpi("$340,000", "Yüksek Olasılık", "High probability", "check")}${kpi("28 / 41", "Forecast Giren", "13 müşteri eksik", "users")}${kpi("68%", "Tamamlanma", "Hedef: %90", "chart")}</div>
   <div class="grid g2 mt">
@@ -775,7 +792,7 @@ ADMIN.products = (arg) => {
   <div class="tabs mt" style="margin-top:22px"><button class="${state.prodTab === "list" ? "on" : ""}" onclick="state.prodTab='list';rerender()">Ürün Listesi</button><button class="${state.prodTab === "res" ? "on" : ""}" onclick="state.prodTab='res';rerender()">Rezervasyonlar</button></div>
   ${state.prodTab === "res" ? reservationsCard() : `<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th>Marka / Kategori</th><th class="r">Physical</th><th class="r">Reserved</th><th class="r">Available</th><th class="r">Sipariş edilebilir</th><th>Stok</th><th>Veri</th></tr></thead><tbody>
   ${PRODUCTS.map((p) => `<tr class="click" onclick="go('admin/product/${p.sku}')"><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td><td class="muted">${p.brand}<br><small>${p.cat}</small></td>
-    <td class="r">${num(p.physical)}</td><td class="r warn-t">${num(p.reserved)}</td><td class="r strong">${num(avail(p))}</td><td class="r">${num(availBoxes(p))} koli</td><td>${stockPill(p)}</td><td>${p.sku === "CP-PRO" ? '<span class="pill warn plain">EAN eksik</span>' : '<span class="pill ok plain">Order Ready</span>'}</td></tr>`).join("")}
+    <td class="r">${num(p.physical)}</td><td class="r warn-t">${num(p.reserved)}</td><td class="r strong">${num(avail(p))}</td><td class="r">${num(availBoxes(p))} koli</td><td>${stockPill(p)}</td><td>${p.est ? '<span class="pill warn plain">Lojistik tahmini</span>' : '<span class="pill ok plain">Order Ready</span>'}</td></tr>`).join("")}
   </tbody></table></div></div>`}`;
 };
 function reservationsCard() {
@@ -790,7 +807,7 @@ function reservationsCard() {
 function extendRes(no) { const o = O(no), d = new Date(o.reserveUntil + " 12:00"); d.setDate(d.getDate() + 7); o.reserveUntil = fmtDate(d); log(no, `Rezervasyon ${o.reserveUntil} tarihine uzatıldı`); toast(`${no} rezervasyonu ${o.reserveUntil} tarihine uzatıldı`); rerender(); }
 function releaseRes(no) { const o = O(no); o.reserveUntil = ""; log(no, "Rezervasyon serbest bırakıldı (yetkili)"); toast(`${no} stoğu serbest bırakıldı · audit log'a yazıldı`, "alert"); rerender(); }
 function bulkImport() {
-  const rows = [["PW-20", "Fiyat (Europe)", "€1.01", "€1.05", true], ["MW-150", "Koli ölçüsü", "34×24×12", "34×24×13", true], ["BO-50", "pcs / koli", "36", "48", true], ["NEW-01", "Yeni SKU", "—", "Beard Balm 50 ml", false, "Ağırlık ve ölçü eksik"], ["CP-PRO", "EAN", "—", "86906051300", false, "EAN 13 hane olmalı"]];
+  const rows = [["BW-20-SKL", "Fiyat (Europe)", "€1.01", "€1.05", true], ["BW-150-MAT-1018", "Koli ölçüsü", "34×24×12", "34×24×13", true], ["BBO-50-TV", "pcs / koli", "36", "48", true], ["NEW-01", "Yeni SKU", "—", "Beard Balm 50 ml", false, "Ağırlık ve ölçü eksik"], ["BCP–PROB", "EAN", "—", "86906051300", false, "EAN 13 hane olmalı"]];
   modal(`<h2>Toplu İçe Aktar</h2><p class="muted">urun_master_2026-09.xlsx · önizleme</p>
   <div class="tbl-wrap" style="margin:0"><table class="tbl"><thead><tr><th>SKU</th><th>Alan</th><th>Eski</th><th>Yeni</th><th>Doğrulama</th></tr></thead><tbody>
   ${rows.map(([s, f, o, n, ok, e]) => `<tr><td class="mono">${s}</td><td>${f}</td><td class="muted">${o}</td><td class="strong">${n}</td><td>${ok ? '<span class="pill ok">Geçerli</span>' : `<span class="pill err">${e}</span>`}</td></tr>`).join("")}
@@ -802,7 +819,7 @@ ADMIN.product = (sku) => {
   const res = ORDERS.filter((o) => o.stage >= 2 && o.stage <= 4 && o.items.some(([s]) => s === sku));
   return `${head(p.name, `${p.sku} · ${p.brand} · ${p.cat}`, `${stockPill(p)}<button class="btn gold">${ic("edit")} Düzenle</button>`, `<a href="#/admin/products">Ürünler</a> / ${p.sku}`)}
   <div class="grid g4">
-    <div class="card" style="padding:0;overflow:hidden;background:#f3f3f1;display:grid;place-items:center;min-height:240px"><img src="img/${p.img}" style="max-width:70%;max-height:220px"></div>
+    <div class="card" style="padding:0;overflow:hidden;background:#f3f3f1;display:grid;place-items:center;min-height:240px">${p.img ? `<img src="${imgSrc(p.img)}" style="max-width:70%;max-height:220px">` : noImg(p)}</div>
     <div class="card"><div class="card-h"><h3>Genel</h3></div><dl class="dl" style="grid-template-columns:90px 1fr"><dt>SKU</dt><dd class="mono">${p.sku}</dd><dt>EAN</dt><dd class="mono">${p.ean}</dd><dt>Marka</dt><dd>${p.brand}</dd><dt>Kategori</dt><dd>${p.cat}</dd><dt>Varyant</dt><dd>${pxVariant(p)}</dd><dt>Durum</dt><dd>Aktif</dd></dl></div>
     <div class="card"><div class="card-h"><h3>Paketleme & Lojistik</h3></div><dl class="dl" style="grid-template-columns:110px 1fr"><dt>pcs / koli</dt><dd>${p.pcsBox}</dd><dt>Koli L×W×H</dt><dd>${p.dims.join(" × ")} cm</dd><dt>Koli CBM</dt><dd>${bv.toFixed(4)} m³</dd><dt>Net / Brüt</dt><dd>${(p.kg * 0.86).toFixed(1)} / ${p.kg} kg</dd><dt>Sınıf</dt><dd>${p.cls}</dd><dt>İstif</dt><dd>${pxStack(p)}</dd><dt>Yön</dt><dd>${pxOrient(p)}</dd><dt>Loose loading</dt><dd class="${p.loose ? "ok-t" : "muted"}">${p.loose ? "Allowed" : "Not allowed"}</dd><dt>Düşük stok eşiği</dt><dd>${num(p.low)} pcs</dd></dl></div>
     <div class="card"><div class="card-h"><h3>Ticaret / Uyum</h3></div><dl class="dl" style="grid-template-columns:90px 1fr"><dt>HS / GTİP</dt><dd class="mono">${p.hs}</dd><dt>Menşe</dt><dd>${p.origin}</dd><dt>DG / UN</dt><dd>${p.dg}</dd><dt>IMDG</dt><dd>${pxImdg(p)}</dd><dt>Flash point</dt><dd>${pxFlash(p)}</dd><dt>Doküman</dt><dd>${DOCUMENTS.filter((d) => d.sku === p.sku || d.sku === "All").length} adet</dd></dl></div>
@@ -813,12 +830,12 @@ ADMIN.product = (sku) => {
       <div class="section-title">Rezervasyonlar</div>
       ${res.length ? res.map((o) => `<div class="stat-row"><span>${o.no} · ${C(o.cust).name}</span><b>${num(o.items.find(([s]) => s === sku)[1] * p.pcsBox)} pcs · ${o.reserveUntil || "—"}'e kadar</b></div>`).join("") : '<div class="muted">Aktif rezervasyon yok.</div>'}
     </div>
-    <div class="card"><div class="card-h"><h3>Veri Tamlığı</h3><span class="pill ok">Order Ready ✓</span></div>
+    <div class="card"><div class="card-h"><h3>Veri Tamlığı</h3>${p.est ? '<span class="pill warn">Lojistik tahmini</span>' : '<span class="pill ok">Order Ready ✓</span>'}</div>
       
-      ${["Ölçüler", "Ağırlık", "pcs/koli", "Sınıf & stacking", "Fiyat (tüm listeler)", "HS kodu", "Görsel", "MSDS"].map((x) => `<div class="stat-row"><span>${x}</span><b class="ok-t">✓</b></div>`).join("")}
+      ${[["Fiyat (6 seviye)", p.prices.every((x) => x != null)], ["pcs/koli", true], ["Barkod", !!p.ean], ["Görsel", !!p.img], ["Koli ölçüsü", !p.est], ["Ağırlık", !p.est], ["HS kodu", !p.est]].map(([x, ok]) => `<div class="stat-row"><span>${x}</span><b class="${ok ? "ok-t" : "warn-t"}">${ok ? "✓" : "tahmini / eksik"}</b></div>`).join("")}
     </div>
     <div class="card"><div class="card-h"><h3>Bağlı İçerik</h3></div>
-      <div class="stat-row"><span>Fiyat listeleri</span><a class="strong" href="#/admin/pricing">${Object.keys(PRICE_LISTS).length} liste →</a></div>
+      <div class="stat-row"><span>Fiyat seviyeleri</span><a class="strong" href="#/admin/pricing">${LEVELS.length} seviye →</a></div>
       <div class="stat-row"><span>Dokümanlar</span><a class="strong" href="#/admin/documents">${DOCUMENTS.filter((d) => d.sku === p.sku || d.sku === "All").length} →</a></div>
       <div class="stat-row"><span>Marketing içerik</span><a class="strong" href="#/admin/marketing">${MARKETING.filter((m) => m.img === p.img).length || 1} →</a></div>
       <div class="section-title">Geçmiş</div>
@@ -848,7 +865,7 @@ ADMIN.loading = (no) => {
       ${target === "pallet" ? `<div class="card"><div class="card-h"><h3>Palet Siparişi</h3><span class="pill ${L.complete ? "ok" : "warn"}">${L.complete ? "COMPLETE" : "INCOMPLETE"}</span></div><div class="stat-row"><span>Palet</span><b>${L.pallets.length}</b></div><div class="stat-row"><span>Koli</span><b>${num(L.boxes)}</b></div><div class="stat-row"><span>Brüt</span><b>${num(L.kg)} kg</b></div></div>`
       : `<div class="card"><div class="card-h"><h3>${L.cap.label} Konteyner</h3><span class="pill ${L.complete ? "ok" : L.over ? "err" : "warn"}">${L.complete ? "COMPLETE" : L.over ? "KAPASİTE AŞILDI" : "INCOMPLETE"}</span></div>${containerVisual(L)}<div class="divider"></div>${containerStats(L)}</div>`}
       <div class="card mt"><div class="card-h"><h3>Tamamlama Önerileri</h3></div>
-        ${L.complete ? `<div class="notice ok">${ic("check")}<span>Yükleme tamamlanmış — öneri yok.</span></div>` : sug.length ? sug.map((s) => `<div class="sugg">${thumb(s.p)}<div class="t"><b>+${s.boxes} koli ${s.p.name}</b><small>${s.p.loose ? "Loose loading uygun" : "Stokta"} · ${money(s.boxes * s.p.pcsBox * unitPrice(s.p, o.currency), o.currency)} · sonrası ${s.after.target === "pallet" ? s.after.last.h + " cm" : s.after.pct + "%"}</small></div><button class="btn sm" onclick="addToOrder('${o.no}','${s.p.sku}',${s.boxes})">Teklif et</button></div>`).join("") : `<div class="notice warn">${ic("alert")}<span>Tek üründe uygun öneri yok — miktarları revize edin.</span></div>`}
+        ${L.complete ? `<div class="notice ok">${ic("check")}<span>Yükleme tamamlanmış — öneri yok.</span></div>` : sug.length ? sug.map((s) => `<div class="sugg">${thumb(s.p)}<div class="t"><b>+${s.boxes} koli ${s.p.name}</b><small>${s.p.loose ? "Loose loading uygun" : "Stokta"} · ${money(s.boxes * s.p.pcsBox * orderPrice(o, s.p), o.currency)} · sonrası ${s.after.target === "pallet" ? s.after.last.h + " cm" : s.after.pct + "%"}</small></div><button class="btn sm" onclick="addToOrder('${o.no}','${s.p.sku}',${s.boxes})">Teklif et</button></div>`).join("") : `<div class="notice warn">${ic("alert")}<span>Tek üründe uygun öneri yok — miktarları revize edin.</span></div>`}
         
       </div>
     </div>
@@ -955,7 +972,7 @@ function allocCalc() {
 
 // ——— Raporlar ———
 ADMIN.reports = () => {
-  const top = [["PW-20", 24500], ["SS-200", 19200], ["BC-400-02", 17400], ["MW-150", 15100], ["GAW-150", 12800]];
+  const top = [["BW-20-SKL", 24500], ["BSS-200 - PS", 19200], ["BC-400-2", 17400], ["BW-150-MAT-1018", 15100], ["BW-150-GUM", 12800]];
   return `${head("Raporlar & Analiz", "", `<button class="btn" onclick="toast('Excel indiriliyor','download')">${ic("download")} Excel</button><button class="btn" onclick="toast('PDF indiriliyor','download')">${ic("download")} PDF</button>`)}
   <div class="card flat" style="margin-bottom:18px"><div class="filters">
     ${[["Son 3 Ay", "Bu Yıl", "Q3 2026", "Q3 2025"], ["Tüm Bölgeler", "Avrupa", "Orta Doğu", "Amerika", "BDT"], ["Tüm Ülkeler", "Germany", "USA", "Lithuania", "UAE"], ["Tüm Markalar", "Marmara Barber", "Marmara", "Noir"], ["Tüm Kategoriler", "Cologne", "Hair Styling", "Shaving"], ["Tüm Müşteriler", ...CUSTOMERS.filter((c) => c.status !== "Pending").map((c) => c.name)], ["Tüm SKU", ...PRODUCTS.map((p) => p.sku)], ["Tüm Satışçılar", "Ferhat", "Gözde"], ["Tüm Dövizler", "USD", "EUR"], ["Değer ($)", "Adet (pcs)"]].map((o) => `<select>${o.map((x) => `<option value="${x}">${x}</option>`).join("")}</select>`).join("")}
@@ -990,7 +1007,7 @@ function uploadDoc() {
   <div class="field span2"><label>Dosya</label><button class="btn">${ic("upload")} PDF seç</button></div></div>
   <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="closeModal();toast('Doküman yüklendi · v1')">Yükle</button></div>`);
 }
-const assetGrid = () => `<div class="agrid">${MARKETING.filter((m) => state.mkKind === "all" || m.kind === state.mkKind).map((a) => `<div class="asset" onclick="toast('${a.title} indiriliyor','download')"><div class="ph"><img src="img/${a.img}"></div><div class="b"><b>${a.title}</b><small>${a.kind} · ${a.n} dosya</small></div></div>`).join("")}</div>`;
+const assetGrid = () => `<div class="agrid">${MARKETING.filter((m) => state.mkKind === "all" || m.kind === state.mkKind).map((a) => `<div class="asset" onclick="toast('${a.title} indiriliyor','download')"><div class="ph"><img src="${imgSrc(a.img)}"></div><div class="b"><b>${a.title}</b><small>${a.kind} · ${a.n} dosya</small></div></div>`).join("")}</div>`;
 const mkChips = (en) => `<div class="filters" style="margin-bottom:16px">${["all", ...new Set(MARKETING.map((m) => m.kind))].map((k) => `<button class="chip ${state.mkKind === k ? "on" : ""}" onclick="state.mkKind='${k}';rerender()">${k === "all" ? (en ? "All" : "Tümü") : k}</button>`).join("")}</div>`;
 ADMIN.marketing = () => `${head("Marketing Hub", "", `<button class="btn gold" onclick="uploadContent()">${ic("upload")} İçerik Yükle</button>`)}
   ${mkChips()}${assetGrid()}
@@ -1043,13 +1060,13 @@ function setSetting(path, v) {
 
 // ═════════════════════════════ MÜŞTERİ PORTALI ═════════════════════════════
 const CUST = {};
-const ME = "C-1021";
+let ME = "C-1021";   // giriş yapan müşteri (auth.js atar)
 const cartItems = () => Object.entries(state.cart).filter(([, b]) => b > 0);
 
 CUST.dashboard = () => {
   const mine = ORDERS.filter((o) => o.cust === ME);
   const active = mine.find((o) => o.stage < 5);
-  return `${head("Welcome back, ABC Distribution", "", `<button class="btn gold lg" onclick="go('customer/products')">${ic("plus")} CREATE NEW ORDER</button>`)}
+  return `${head(`Welcome back, ${C(ME).name}`, "", `<button class="btn gold lg" onclick="go('customer/products')">${ic("plus")} CREATE NEW ORDER</button>`)}
   <div class="grid g4">${kpi(mine.filter((o) => o.stage < 5).length, "Active Orders", "In progress", "cart")}${kpi(mine.filter((o) => o.stage === 4).length, "Ready for Shipment", "Awaiting pickup", "truck")}${kpi("October", "Next Forecast", "Due in 5 days", "trend")}${kpi(12, "Orders", "Last 12 months", "box")}</div>
   ${active ? `<div class="card mt"><div class="card-h"><h3>Order ${active.no}</h3>${stagePill(active.stage, true)}</div>${stepper(active.stage, STAGES_EN)}
     <div class="between mt wrap"><span class="muted">${money(orderTotal(active), active.currency)} · ${targetLabel(active.target)} · Payment: ${payState(active)[0]}</span><button class="btn sm" onclick="go('customer/order/${active.no}')">View order ${ic("chevR")}</button></div></div>` : ""}
@@ -1076,9 +1093,9 @@ CUST.products = () => {
 function productCard(p) {
   const b = state.cart[p.sku] || 0, s = stockState(p);
   return `<div class="pcard ${b ? "in" : ""} ${s === "out" ? "out" : ""}" id="pc-${p.sku}">
-    <div class="ph"><img src="img/${p.img}" alt="">${stockPill(p, true)}${p.loose ? '<span class="loose">LOOSE OK</span>' : ""}</div>
+    <div class="ph">${p.img ? `<img src="${imgSrc(p.img)}" alt="" loading="lazy">` : noImg(p)}${stockPill(p, true)}${p.loose ? '<span class="loose">LOOSE OK</span>' : ""}</div>
     <div class="pb"><div class="pn">${p.name}</div><div class="ps mono">${p.sku} · ${p.brand}</div>
-      <div class="pp"><b>${money(p.price, "USD", 2)}<small> / pcs</small></b><small>${p.pcsBox} pcs / box</small></div>
+      <div class="pp"><b>${money(custPrice(p), levelCur(levelOf(ME)), 2)}<small> / pcs</small></b><small>${p.pcsBox} pcs / box</small></div>
       <div class="qty">${s === "out" ? `<span class="muted" style="margin:auto;font-size:12px">Notify me when back</span>` : `<button onclick="setQty('${p.sku}',${b - 1})">−</button><input value="${b}" inputmode="numeric" onchange="setQty('${p.sku}',this.value)"><span class="u">BOXES</span><button onclick="setQty('${p.sku}',${b + 1})">+</button>`}</div>
     </div></div>`;
 }
@@ -1112,7 +1129,7 @@ function cartPanel() {
       ${L.over ? `<div class="notice err mt">${ic("alert")}<span>Over capacity. Switch to a larger container or reduce boxes.</span></div>` : L.complete ? `<div class="notice ok mt">${ic("check")}<span>Container is complete.</span></div>` : `<div class="notice warn mt">${ic("alert")}<span>Container needs ≥${L.cap.threshold}% load.</span></div><button class="btn gold block mt" onclick="completeModal()">COMPLETE CONTAINER</button>`}`;
   }
   return `<div class="card cartp"><div class="card-h"><h3>Current Order</h3><span class="sub">${items.length} SKUs</span></div>
-    <div class="total">${money(total, "USD", 2)}</div>
+    <div class="total">${money(total, levelCur(levelOf(ME)), 2)}</div>
     <div class="mt"><div class="stat-row"><span>Boxes</span><b>${num(L.boxes)}</b></div><div class="stat-row"><span>Pieces</span><b>${num(L.pcs)}</b></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length}</b></div><div class="stat-row"><span>Gross weight</span><b>${num(L.kg)} kg</b></div></div>
     <div class="section-title" style="margin-top:16px">Loading target</div>
     <div class="seg">${seg("pallet", "Pallet")}${seg("20", "20' Cont.")}${seg("40", "40' Cont.")}</div>
@@ -1125,7 +1142,7 @@ function completeModal() {
   const isP = state.cartTarget === "pallet";
   modal(`<h2>${isP ? "Complete Pallet " + L.pallets.length : "Complete " + L.cap.label}</h2>
   <p class="muted">${isP ? `Current height ${L.last.h} cm — about ${L.gapCm} cm more needed. ` : `Current load ${L.pct}% — ${(L.cap.m3 * 0.95 - L.usedM3).toFixed(1)} m³ more to reach 95%. `}Suggestions use only in-stock products that physically fit${isP ? "" : " as loose loading"}. Nothing is added without your approval.</p>
-  ${sug.length ? sug.map((s) => `<div class="sugg">${thumb(s.p)}<div class="t"><b>+${s.boxes} boxes · ${s.p.name}</b><small>${s.inCart ? "Already in your order · " : ""}${money(s.boxes * s.p.pcsBox * s.p.price, "USD", 2)} · after: ${s.after.target === "pallet" ? s.after.last.h + " cm" : s.after.pct + "%"}</small></div><button class="btn sm gold" onclick="acceptSugg('${s.p.sku}',${s.boxes})">Add</button></div>`).join("") : `<div class="notice warn">${ic("alert")}<span>No single product fits — please adjust quantities or talk to your sales rep.</span></div>`}
+  ${sug.length ? sug.map((s) => `<div class="sugg">${thumb(s.p)}<div class="t"><b>+${s.boxes} boxes · ${s.p.name}</b><small>${s.inCart ? "Already in your order · " : ""}${money(s.boxes * s.p.pcsBox * custPrice(s.p), levelCur(levelOf(ME)), 2)} · after: ${s.after.target === "pallet" ? s.after.last.h + " cm" : s.after.pct + "%"}</small></div><button class="btn sm gold" onclick="acceptSugg('${s.p.sku}',${s.boxes})">Add</button></div>`).join("") : `<div class="notice warn">${ic("alert")}<span>No single product fits — please adjust quantities or talk to your sales rep.</span></div>`}
   <div class="m-actions"><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
 function acceptSugg(sku, boxes) {
@@ -1142,15 +1159,15 @@ CUST.checkout = () => {
   <div class="grid g-side"><div>
     <div class="card"><div class="card-h"><h3>Order Review</h3><a class="sub" href="#/customer/products">Edit</a></div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Unit</th><th class="r">Total</th></tr></thead><tbody>
-      ${items.map(([sku, b]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r muted">${money(p.price, "USD", 2)}</td><td class="r strong">${money(lineTotal(sku, b), "USD", 2)}</td></tr>`; }).join("")}
+      ${items.map(([sku, b]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r muted">${money(custPrice(p), levelCur(levelOf(ME)), 2)}</td><td class="r strong">${money(lineTotal(sku, b), levelCur(levelOf(ME)), 2)}</td></tr>`; }).join("")}
       </tbody></table></div></div>
     <div class="card mt"><div class="card-h"><h3>Loading</h3><span class="pill ${L.complete ? "ok" : "warn"}">${L.complete ? "COMPLETE ✓" : "INCOMPLETE"}</span></div>
       <div class="stat-row"><span>Target</span><b>${targetLabel(state.cartTarget)}</b></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length} complete</b></div>${state.cartTarget !== "pallet" ? `<div class="stat-row"><span>Loose load</span><b>${L.looseBoxes} boxes</b></div><div class="stat-row"><span>Container load</span><b>${L.pct}%</b></div>` : ""}</div>
     <div class="card mt"><div class="form cols2"><div class="field"><label>Delivery Address</label><select class="input"><option>Berlin Warehouse — Lagerstr. 12, 13407 Berlin</option><option>Hamburg Hub</option></select></div><div class="field"><label>Your PO Number</label><input class="input" id="ckPo" placeholder="Optional"></div><div class="field span2"><label>Order Notes</label><textarea class="input" id="ckNote" placeholder="Optional…"></textarea></div></div></div>
   </div>
   <div><div class="card cartp"><div class="card-h"><h3>Order Summary</h3></div>
-    <div class="stat-row"><span>Subtotal</span><b>${money(total, "USD", 2)}</b></div><div class="stat-row"><span>Shipping term</span><b>EXW Düzce</b></div><div class="stat-row"><span>Payment term</span><b>100% Advance</b></div><div class="stat-row"><span>Boxes</span><b>${num(L.boxes)}</b></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length}</b></div>
-    <div class="between mt"><span style="font:600 16px var(--display)">TOTAL</span><span class="total">${money(total, "USD", 2)}</span></div>
+    <div class="stat-row"><span>Subtotal</span><b>${money(total, levelCur(levelOf(ME)), 2)}</b></div><div class="stat-row"><span>Shipping term</span><b>EXW Düzce</b></div><div class="stat-row"><span>Payment term</span><b>100% Advance</b></div><div class="stat-row"><span>Boxes</span><b>${num(L.boxes)}</b></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length}</b></div>
+    <div class="between mt"><span style="font:600 16px var(--display)">TOTAL</span><span class="total">${money(total, levelCur(levelOf(ME)), 2)}</span></div>
     <div class="notice info mt">${ic("info")}<span>Stock is reserved after sales review & final approval. You'll receive a proforma invoice by email.</span></div>
     <button class="btn ok block lg mt" ${L.complete ? "" : "disabled"} onclick="placeOrder()">PLACE ORDER</button>
     ${L.complete ? "" : `<p class="warn-t" style="font-size:12px">Place Order is disabled — loading is incomplete.</p>`}
@@ -1172,7 +1189,7 @@ CUST.order = (no) => {
   <div class="card">${stepper(Math.min(o.stage, 5), STAGES_EN)}</div>
   ${o.note || o.po ? `<div class="card note-card mt"><div class="card-h"><h3>${ic("edit")} Your Note</h3>${o.po ? `<span class="pill plain">PO: ${o.po}</span>` : ""}</div>${o.note ? `<p class="notranslate">${o.note.replace(/</g, "&lt;")}</p>` : ""}</div>` : ""}
   <div class="grid g-side mt"><div class="card"><div class="card-h"><h3>Products</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Total</th></tr></thead><tbody>
-    ${o.items.map(([sku, b, pr]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(sku, b, o.currency, pr), o.currency)}</td></tr>`; }).join("")}
+    ${o.items.map(([sku, b, pr]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(sku, b, orderLevel(o), pr), o.currency)}</td></tr>`; }).join("")}
     </tbody></table></div></div>
   <div><div class="card"><div class="card-h"><h3>Summary</h3></div><div class="stat-row"><span>Pallets</span><b>${L.pallets.length}</b></div><div class="stat-row"><span>Boxes / pcs</span><b>${num(L.boxes)} / ${num(L.pcs)}</b></div><div class="stat-row"><span>Payment</span><b><span class="pill ${ps[1]}">${ps[0]}</span></b></div><div class="stat-row"><span>Paid / Balance</span><b>${money(o.paid, o.currency)} / ${money(Math.max(0, t - o.paid), o.currency)}</b></div><div class="stat-row"><span>Incoterm</span><b>EXW Düzce</b></div></div>
   <div class="card mt"><div class="card-h"><h3>Documents</h3></div>${[["pi", "Proforma Invoice", true], ["pl", "Packing List", true], ["ci", "Commercial Invoice", o.stage >= 5]].map(([k, d, ok]) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${d}</span>${ok ? `<button class="btn sm" onclick="openDoc('${o.no}','${k}')">${ic("download")}</button>` : `<small class="dim">not yet</small>`}</div>`).join("")}</div></div></div>`;
@@ -1188,7 +1205,7 @@ function reorder(no) {
 }
 CUST.forecast = () => `${head("Forecast", "", `<button class="btn" onclick="toast('September forecast copied','copy')">${ic("copy")} Copy previous month</button><button class="btn" onclick="toast('Last order copied into forecast','copy')">${ic("copy")} Copy last order</button><button class="btn gold" onclick="toast('October forecast submitted · thank you!')">Submit Forecast</button>`)}
   <div class="grid g-side"><div class="card"><div class="card-h"><h3>October 2026</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Est. value</th></tr></thead><tbody>
-    ${[["BC-400-02", 60], ["PW-20", 40], ["MW-150", 50], ["SG-77", 30], ["NS-100", 25]].map(([s, b]) => { const p = P(s); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${s}</small></div></div></td><td class="c"><input class="input" style="width:80px;height:34px;text-align:center" value="${b}"></td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(s, b))}</td></tr>`; }).join("")}
+    ${[["BC-400-2", 60], ["BW-20-SKL", 40], ["BW-150-MAT-1018", 50], ["BSG-1000-77", 30], ["BNS-W", 25]].map(([s, b]) => { const p = P(s); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${s}</small></div></div></td><td class="c"><input class="input" style="width:80px;height:34px;text-align:center" value="${b}"></td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(s, b))}</td></tr>`; }).join("")}
     </tbody></table></div><button class="btn sm mt">${ic("plus")} Add product</button></div>
   <div class="card flat"><div class="form"><div class="field"><label>Month</label><select class="input"><option>October 2026</option><option>November 2026</option></select></div><div class="field"><label>Expected order date</label><input class="input" type="date" value="2026-10-20"></div><div class="field"><label>Estimated budget (USD)</label><input class="input" value="25,000"></div><div class="field"><label>Confidence</label><select class="input"><option>High</option><option>Medium</option><option>Low</option></select></div></div></div></div>`;
 CUST.documents = () => `${head("Document Center", "", `<button class="btn gold" onclick="toast('All available documents are being zipped','download')">${ic("download")} Download All</button>`)}<div class="card">${docsTable(true, C(ME))}</div>`;
@@ -1197,36 +1214,6 @@ CUST.account = () => { const c = C(ME); return `${head("Account", c.name)}
   <div class="grid g2"><div class="card"><div class="card-h"><h3>Company</h3></div><dl class="dl"><dt>Company</dt><dd>${c.name}</dd><dt>Country</dt><dd>${c.flag} ${c.country}</dd><dt>VAT</dt><dd class="mono">${c.vat}</dd><dt>Payment term</dt><dd>${c.payment}</dd><dt>Shipping term</dt><dd>${c.incoterm}</dd><dt>Your sales rep</dt><dd>${c.sales} · ferhat@marmarabarber.com</dd></dl></div>
   <div class="card"><div class="card-h"><h3>Addresses</h3><button class="btn sm">${ic("plus")} Add</button></div><div class="stat-row"><span style="color:var(--text)">Berlin Warehouse</span><small class="muted">Default</small></div><div class="stat-row"><span style="color:var(--text)">Hamburg Hub</span><small></small></div>
   <div class="card-h mt"><h3>Users</h3><button class="btn sm">${ic("plus")} Invite</button></div><div class="stat-row"><span style="color:var(--text)">John Smith</span><small class="muted">Admin</small></div><div class="stat-row"><span style="color:var(--text)">Lena Fischer</span><small class="muted">Orders</small></div></div></div>`; };
-
-CUST.register = () => {
-  if (state.regDone) return `${head("Application received", "")}
-  <div class="card" style="max-width:760px">${stepper(1, ["Application", "Under review", "Approved"])}
-    <div class="notice info mt">${ic("info")}<span>Your account is Pending Approval. Prices and stock will be visible once our team approves your application — usually within 1 business day.</span></div>
-    <div class="row mt"><button class="btn" onclick="state.regDone=false;rerender()">New application</button><button class="btn gold" onclick="go('admin/customers')">Admin'de gör →</button></div></div>`;
-  const f = (l, id, v = "", t = "text") => `<div class="field"><label>${l}</label><input class="input" id="${id}" type="${t}" value="${v}"></div>`;
-  const s = (l, id, opts) => `<div class="field"><label>${l}</label><select class="input" id="${id}">${opts.map((o) => `<option value="${o}">${o}</option>`).join("")}</select></div>`;
-  return `${head("Create your B2B account", "")}
-  <div class="card" style="max-width:1000px"><div class="form cols3">
-    ${f("Company name *", "rgName")}${s("Country *", "rgCountry", ["Germany", "France", "Sweden", "USA", "UAE", "Saudi Arabia", "Lithuania", "Romania"])}${f("City", "rgCity")}
-    ${f("Tax / VAT number *", "rgVat")}${f("Website", "rgWeb")}${s("Company type", "rgType", ["Distributor", "Wholesaler", "Barber Chain", "Retail Chain"])}
-    ${f("Contact name *", "rgContact")}${f("Position", "rgPos")}${f("Business email *", "rgEmail", "", "email")}
-    ${f("WhatsApp / Phone", "rgPhone")}<div class="field span2"><label>Interested brands</label><div class="checks">${["Marmara Barber", "Marmara", "Noir"].map((b) => `<label><input type="checkbox" class="rgBrand" value="${b}" checked>${b}</label>`).join("")}</div></div>
-    ${f("Password *", "rgPw", "", "password")}${f("Confirm password *", "rgPw2", "", "password")}
-    <div class="field" style="justify-content:flex-end"><button class="btn gold lg" onclick="submitApplication()">SUBMIT APPLICATION</button></div>
-  </div></div>`;
-};
-function submitApplication() {
-  const v = (id) => $("#" + id).value.trim();
-  if (!v("rgName") || !v("rgVat") || !v("rgContact") || !v("rgEmail") || !v("rgPw")) { toast("Please fill all required fields", "alert"); return; }
-  if (v("rgPw") !== v("rgPw2")) { toast("Passwords do not match", "alert"); return; }
-  const country = v("rgCountry");
-  const flags = { Germany: "🇩🇪", France: "🇫🇷", Sweden: "🇸🇪", USA: "🇺🇸", UAE: "🇦🇪", "Saudi Arabia": "🇸🇦", Lithuania: "🇱🇹", Romania: "🇷🇴" };
-  CUSTOMERS.push({ id: "A-00" + (40 + CUSTOMERS.length), name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", type: v("rgType"), sales: "", list: "", currency: "EUR", payment: "", incoterm: "", status: "Pending", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
-    contact: v("rgContact"), email: v("rgEmail"), vat: v("rgVat"), brands: [...document.querySelectorAll(".rgBrand:checked")].map((b) => b.value).join(" / "), applied: "30 Sep 2026", phone: v("rgPhone") || "—", position: v("rgPos") || "—", website: v("rgWeb") || "—" });
-  state.regDone = true;
-  toast("Application submitted · sales team notified");
-  rerender();
-}
 
 // ═════════════════════════════ FABRİKA ═════════════════════════════
 const FACT = {};
@@ -1240,9 +1227,9 @@ FACT.prep = (no) => {
   const allChecked = pc.every(Boolean);
   return `${head(`Sipariş ${no}`, `Hazırlığa bırakıldı · ${C(o.cust).flag} ${C(o.cust).country} · ${targetLabel(o.target)} · ${L.pallets.length} palet`, `${o.stage === 4 ? '<span class="pill ok">TAMAMLANDI</span>' : '<span class="pill warn">HAZIRLANIYOR</span>'}`, `<a href="#/factory/queue">Kuyruk</a> / ${no}`)}
   <div class="card" style="margin-bottom:18px">${stepper(o.stage === 4 ? 3 : allDone ? 2 : 1, ["Kuyruk", "Koli Hazırlama", "Palet Kontrol", "Tamamlandı"])}</div>
-  ${o.problem ? `<div class="notice err" style="margin-bottom:18px">${ic("alert")}<span><b>Bildirilen problem:</b> BC-400-02 — 103 koli gerekli, 101 bulundu. Satış + Operasyon'a alert düştü, müşteriye otomatik gösterilmez.</span></div>` : ""}
+  ${o.problem ? `<div class="notice err" style="margin-bottom:18px">${ic("alert")}<span><b>Bildirilen problem:</b> BC-400-2 — 103 koli gerekli, 101 bulundu. Satış + Operasyon'a alert düştü, müşteriye otomatik gösterilmez.</span></div>` : ""}
   <div class="grid g-main"><div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th class="r">Gerekli</th><th class="c">Hazırlanan</th><th class="c">Durum</th></tr></thead><tbody>
-    ${o.items.map(([s, b]) => { const p = P(s), d = pr[s] || 0; return `<tr><td><div class="prod-cell"><div class="thumb" style="width:56px;height:56px">${`<img src="img/${p.img}">`}</div><div><b>${p.name}</b><br><small class="mono">${s}</small> <small class="muted">· ${p.cls}</small></div></div></td>
+    ${o.items.map(([s, b]) => { const p = P(s), d = pr[s] || 0; return `<tr><td><div class="prod-cell"><div class="thumb" style="width:56px;height:56px">${p.img ? `<img src="${imgSrc(p.img)}">` : noImg(p)}</div><div><b>${p.name}</b><br><small class="mono">${s}</small> <small class="muted">· ${p.cls}</small></div></div></td>
       <td class="r"><b>${b} koli</b><br><small class="muted">${num(b * p.pcsBox)} pcs</small></td>
       <td class="c"><div class="qty" style="width:150px;margin:auto"><button onclick="prepSet('${no}','${s}',${d - 1})">−</button><input value="${d}" onchange="prepSet('${no}','${s}',this.value)"><button onclick="prepSet('${no}','${s}',${d + 1})">+</button></div></td>
       <td class="c">${d >= b ? '<span class="pill ok">✓ Tamam</span>' : d > 0 ? `<span class="pill warn">${b - d} eksik</span>` : '<span class="pill plain">Bekliyor</span>'}</td></tr>`; }).join("")}
@@ -1293,7 +1280,8 @@ function reportProblem(no) {
 const CAT_TR = {
   Cologne: "kolonya kolonyası parfüm koku", Fragrance: "parfüm parfum edp koku", "Hair Styling": "wax vaks şekillendirici jöle sprey saç",
   "Hair Care": "şampuan sampuan saç bakım krem fön suyu", Shaving: "tıraş tiras jeli jel", Beard: "sakal yağı yag bakım",
-  Accessories: "aksesuar boyun bandı penuar önlük",
+  Accessories: "aksesuar boyun bandı penuar önlük fırça tarak çanta stand pompa",
+  "Home Fragrance": "oda kokusu çubuk sprey ev",
 };
 const srchNorm = (s) => String(s).toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
 const srchHit = (text, q) => srchNorm(q).split(/\s+/).filter(Boolean).every((w) => srchNorm(text).split(/[^a-z0-9]+/).some((t) => t.startsWith(w)) || srchNorm(text).includes(w));
@@ -1339,9 +1327,13 @@ function srchMount() {
 }
 
 // ——— başlat ———
+ORDERS.forEach((o) => { syncOrder(o); if (o.paidPct != null) o.paid = Math.round(orderTotal(o) * o.paidPct); });
+CUSTOMERS.forEach((c) => (c.currency = levelCur(levelOf(c.id))));
 document.querySelectorAll("[data-i]").forEach((el) => (el.outerHTML = ic(el.dataset.i)));
 $("#collapse").innerHTML = ic("chevL");
 $("#burger").innerHTML = ic("menu");
+$("#logoutBtn").innerHTML = ic("logout");
+$("#logoutBtn").onclick = authLogout;
 srchMount();
 $("#collapse").onclick = () => { $("#app").classList.toggle("mini"); $("#collapse").innerHTML = ic($("#app").classList.contains("mini") ? "chevR" : "chevL"); };
 $("#burger").onclick = () => $("#app").classList.toggle("nav-open");
