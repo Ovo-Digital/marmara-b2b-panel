@@ -1,5 +1,16 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Tüm markalar": {"tr":"Tüm markalar","en":"All brands","es":"Todas las marcas","de":"Alle Marken","ru":"Все бренды"},
+  "Tüm kategoriler": {"tr":"Tüm kategoriler","en":"All categories","es":"Todas las categorías","de":"Alle Kategorien","ru":"Все категории"},
+  "Çıkış yap": {"tr":"Çıkış yap","en":"Sign out","es":"Cerrar sesión","de":"Abmelden","ru":"Выйти"},
+  "Ürün adı, SKU veya barkod ara…": {"tr":"Ürün adı, SKU veya barkod ara…","en":"Search product name, SKU or barcode…","es":"Buscar nombre, SKU o código de barras…","de":"Produktname, SKU oder Barcode suchen…","ru":"Поиск по названию, SKU или штрихкоду…"},
+  "Search product name, SKU or barcode…": {"tr":"Ürün adı, SKU veya barkod ara…","en":"Search product name, SKU or barcode…","es":"Buscar nombre, SKU o código de barras…","de":"Produktname, SKU oder Barcode suchen…","ru":"Поиск по названию, SKU или штрихкоду…"},
+  "Tüm stok": {"tr":"Tüm stok","en":"All stock","es":"Todo el stock","de":"Alle Bestände","ru":"Все остатки"},
+  "All stock": {"tr":"Tüm stok","en":"All stock","es":"Todo el stock","de":"Alle Bestände","ru":"Все остатки"},
+  "# / # ürün": {"tr":"# / # ürün","en":"# / # products","es":"# / # productos","de":"# / # Produkte","ru":"# / # товаров"},
+  "# / # products": {"tr":"# / # ürün","en":"# / # products","es":"# / # productos","de":"# / # Produkte","ru":"# / # товаров"},
+  "Aramaya uyan ürün yok": {"tr":"Aramaya uyan ürün yok","en":"No products match your search","es":"Ningún producto coincide con la búsqueda","de":"Keine Produkte gefunden","ru":"Ничего не найдено"},
+  "No products match your search": {"tr":"Aramaya uyan ürün yok","en":"No products match your search","es":"Ningún producto coincide con la búsqueda","de":"Keine Produkte gefunden","ru":"Ничего не найдено"},
   "# #' ve #' konteynerin gerçek yükleme kapasitesi nedir? (m³, kg, kaç palet) Konteyner kaç %'de 'tamam' sayılsın?": {"tr":"# #' ve #' konteynerin gerçek yükleme kapasitesi nedir? (m³, kg, kaç palet) Konteyner kaç %'de 'tamam' sayılsın?","en":"# What is the actual loading capacity of #' and #' containers? (m³, kg, how many pallets) At what % should a container count as 'complete'?","es":"# ¿Cuál es la capacidad real de carga de los contenedores de #' y #'? (m³, kg, cuántos palés) ¿A partir de qué % se considera 'completo' un contenedor?","de":"# Wie hoch ist die tatsächliche Ladekapazität von #'- und #'-Containern? (m³, kg, wie viele Paletten) Ab wie viel % gilt ein Container als 'komplett'?","ru":"# Какова реальная вместимость контейнеров #' и #'? (м³, кг, сколько паллет) При каком % контейнер считается 'полным'?"},
   "# & Rapor": {"tr":"# & Rapor","en":"# & Report","es":"# e informe","de":"# & Bericht","ru":"# и отчёт"},
   "# & Ödemeler": {"tr":"# & Ödemeler","en":"# & Payments","es":"# y pagos","de":"# & Zahlungen","ru":"# и платежи"},

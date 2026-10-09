@@ -190,7 +190,8 @@ const state = {
   mode: "admin",
   cart: { "BC-400-2": 24, "BSG-1000-77": 20, "BS-1150-KRT": 16, "BW-150-MAT-1018": 30, "BW-20-SKL": 20, "BSS-200 - PS": 10 },
   cartTarget: "pallet",
-  filter: { orders: -1, customers: "all", brand: "all", cat: "all", q: "" },
+  filter: { orders: -1, customers: "all", brand: "all", cat: "all", stock: "all", q: "" },
+  pf: { brand: "all", cat: "all", stock: "all", q: "" },
   loadingOrder: "SO-2026-0148",
   loadingTarget: null,
   prep: {
@@ -295,11 +296,12 @@ function render() {
   const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode];
   const fn = views[page] || views[Object.keys(views)[0]];
   $("#view").innerHTML = fn(arg);
+  prodFilter();
   storeQueue();
   $("#app").classList.remove("nav-open");
   window.scrollTo(0, 0);
 }
-function rerender() { if (!authSession()) return; const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); window.scrollTo(0, y); storeQueue(); }
+function rerender() { if (!authSession()) return; const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); prodFilter(); window.scrollTo(0, y); storeQueue(); }
 
 // ——— modal & toast ———
 function modal(html) { $("#modalBox").innerHTML = html; $("#modal").classList.add("on"); }
@@ -791,10 +793,10 @@ ADMIN.products = (arg) => {
     <div><span class="gold-t">→</span> <b>B2B Stok Motoru</b> <span class="gold-t">→</span><br><small class="muted">Physical − Reserved = Available</small></div>
     <div><b>Müşteri Portalı</b><br><small class="muted">In Stock / Low / Out — adet gösterilmez</small></div></div></div>
   <div class="tabs mt" style="margin-top:22px"><button class="${state.prodTab === "list" ? "on" : ""}" onclick="state.prodTab='list';rerender()">Ürün Listesi</button><button class="${state.prodTab === "res" ? "on" : ""}" onclick="state.prodTab='res';rerender()">Rezervasyonlar</button></div>
-  ${state.prodTab === "res" ? reservationsCard() : `<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th>Marka / Kategori</th><th class="r">Physical</th><th class="r">Reserved</th><th class="r">Available</th><th class="r">Sipariş edilebilir</th><th>Stok</th><th>Veri</th></tr></thead><tbody>
-  ${PRODUCTS.map((p) => `<tr class="click" onclick="go('admin/product/${p.sku}')"><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td><td class="muted">${p.brand}<br><small>${p.cat}</small></td>
+  ${state.prodTab === "res" ? reservationsCard() : `${prodFilterBar("pf")}<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th>Marka / Kategori</th><th class="r">Physical</th><th class="r">Reserved</th><th class="r">Available</th><th class="r">Sipariş edilebilir</th><th>Stok</th><th>Veri</th></tr></thead><tbody>
+  ${PRODUCTS.map((p) => `<tr class="click" ${prodAttrs(p)} onclick="go('admin/product/${p.sku}')"><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td><td class="muted">${p.brand}<br><small>${p.cat}</small></td>
     <td class="r">${num(p.physical)}</td><td class="r warn-t">${num(p.reserved)}</td><td class="r strong">${num(avail(p))}</td><td class="r">${num(availBoxes(p))} koli</td><td>${stockPill(p)}</td><td>${p.est ? '<span class="pill warn plain">Lojistik tahmini</span>' : '<span class="pill ok plain">Order Ready</span>'}</td></tr>`).join("")}
-  </tbody></table></div></div>`}`;
+  </tbody></table><div class="pf-empty muted" id="pfEmpty" style="display:none">Aramaya uyan ürün yok</div></div></div>`}`;
 };
 function reservationsCard() {
   const list = ORDERS.filter((o) => o.stage >= 1 && o.stage <= 4 && o.reserveUntil);
@@ -1103,24 +1105,15 @@ CUST.dashboard = () => {
   <div class="notice gold">${ic("trend")}<span>Your October forecast is due. It helps us plan production for you.</span></div></div></div>`;
 };
 
-CUST.products = () => {
-  const f = state.filter;
-  const brands = [...new Set(PRODUCTS.map((p) => p.brand))], cats = [...new Set(PRODUCTS.map((p) => p.cat))];
-  const list = PRODUCTS.filter((p) => (f.brand === "all" || p.brand === f.brand) && (f.cat === "all" || p.cat === f.cat) && (!f.q || srchHit(prodText(p), f.q)));
-  return `${head("Products / New Order", "")}
-  <div class="filters" style="margin-bottom:18px">
-    <select onchange="state.filter.brand=this.value;rerender()"><option value="all">All brands</option>${brands.map((b) => `<option value="${b}" ${f.brand === b ? "selected" : ""}>${b}</option>`).join("")}</select>
-    <select onchange="state.filter.cat=this.value;rerender()"><option value="all">All categories</option>${cats.map((b) => `<option value="${b}" ${f.cat === b ? "selected" : ""}>${b}</option>`).join("")}</select>
-    <div class="search" style="width:260px;height:38px"><span>${ic("search")}</span><input value="${f.q}" placeholder="Search SKU / product…" onchange="state.filter.q=this.value;rerender()"></div>
-  </div>
+CUST.products = () => `${head("Products / New Order", "")}
+  ${prodFilterBar("filter", true)}
   <div class="grid g-side">
-    <div class="pgrid">${list.map(productCard).join("")}</div>
+    <div><div class="pgrid">${PRODUCTS.map(productCard).join("")}</div><div class="pf-empty muted" id="pfEmpty" style="display:none">No products match your search</div></div>
     <div id="cartPanel">${cartPanel()}</div>
   </div>`;
-};
 function productCard(p) {
   const b = state.cart[p.sku] || 0, s = stockState(p);
-  return `<div class="pcard ${b ? "in" : ""} ${s === "out" ? "out" : ""}" id="pc-${p.sku}">
+  return `<div class="pcard ${b ? "in" : ""} ${s === "out" ? "out" : ""}" id="pc-${p.sku}" ${prodAttrs(p)}>
     <div class="ph">${p.img ? `<img src="${imgSrc(p.img)}" alt="" loading="lazy">` : noImg(p)}${stockPill(p, true)}${p.loose ? '<span class="loose">LOOSE OK</span>' : ""}</div>
     <div class="pb"><div class="pn">${p.name}</div><div class="ps mono">${p.sku} · ${p.brand}</div>
       <div class="pp"><b>${money(custPrice(p), levelCur(levelOf(ME)), 2)}<small> / pcs</small></b><small>${p.pcsBox} pcs / box</small></div>
@@ -1133,7 +1126,7 @@ function setQty(sku, v) {
   if (n > availBoxes(p)) { n = availBoxes(p); toast(`Only ${n} boxes available for ${p.name}`, "alert"); }
   state.cart[sku] = n;
   const card = document.getElementById("pc-" + sku);
-  if (card) card.outerHTML = productCard(p);
+  if (card) { const hid = card.style.display; card.outerHTML = productCard(p); document.getElementById("pc-" + sku).style.display = hid; }
   const cp = document.getElementById("cartPanel");
   if (cp) cp.innerHTML = cartPanel();
 }
@@ -1315,6 +1308,33 @@ const CAT_TR = {
 const srchNorm = (s) => String(s).toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
 const srchHit = (text, q) => srchNorm(q).split(/\s+/).filter(Boolean).every((w) => srchNorm(text).split(/[^a-z0-9]+/).some((t) => t.startsWith(w)) || srchNorm(text).includes(w));
 const prodText = (p) => `${p.name} ${p.sku} ${p.brand} ${p.cat} ${CAT_TR[p.cat] || ""} ${p.ean}`;
+
+// ——— ürün listelerinde anlık filtre: yazdıkça süzülür, ekran yeniden çizilmez (odak kaybolmaz) ———
+const pfEsc = (t) => String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const prodAttrs = (p) => `data-pq="${pfEsc(prodText(p))}" data-brand="${pfEsc(p.brand)}" data-cat="${pfEsc(p.cat)}" data-stock="${stockState(p)}"`;
+function prodFilterBar(key, en) {
+  const f = state[key], brands = [...new Set(PRODUCTS.map((p) => p.brand))], cats = [...new Set(PRODUCTS.map((p) => p.cat))].sort();
+  const opt = (v, l, cur) => `<option value="${pfEsc(v)}" ${cur === v ? "selected" : ""}>${l}</option>`;
+  const set = (k) => `state.${key}.${k}=this.value;prodFilter()`;
+  return `<div class="filters pf" id="pf" data-key="${key}" data-en="${en ? 1 : ""}">
+    <div class="search pf-q"><span>${ic("search")}</span><input type="search" value="${pfEsc(f.q)}" placeholder="${en ? "Search product name, SKU or barcode…" : "Ürün adı, SKU veya barkod ara…"}" oninput="${set("q")}"></div>
+    <select onchange="${set("brand")}">${opt("all", en ? "All brands" : "Tüm markalar", f.brand)}${brands.map((b) => opt(b, b, f.brand)).join("")}</select>
+    <select onchange="${set("cat")}">${opt("all", en ? "All categories" : "Tüm kategoriler", f.cat)}${cats.map((c) => opt(c, en ? c : CAT_TR[c] || c, f.cat)).join("")}</select>
+    <select onchange="${set("stock")}">${opt("all", en ? "All stock" : "Tüm stok", f.stock)}${opt("in", en ? "In Stock" : "Stokta", f.stock)}${opt("low", en ? "Low Stock" : "Düşük Stok", f.stock)}${opt("out", en ? "Out of Stock" : "Stok Yok", f.stock)}</select>
+    <span class="pf-n muted" id="pfN"></span>
+  </div>`;
+}
+function prodFilter() {
+  const bar = $("#pf"); if (!bar) return;
+  const f = state[bar.dataset.key], en = !!bar.dataset.en, items = [...document.querySelectorAll("#view [data-pq]")];
+  let n = 0;
+  items.forEach((el) => {
+    const hit = (f.brand === "all" || el.dataset.brand === f.brand) && (f.cat === "all" || el.dataset.cat === f.cat) && (f.stock === "all" || el.dataset.stock === f.stock) && (!f.q.trim() || srchHit(el.dataset.pq, f.q));
+    el.style.display = hit ? "" : "none"; n += hit;
+  });
+  $("#pfN").textContent = en ? `${n} / ${items.length} products` : `${n} / ${items.length} ürün`;
+  const empty = $("#pfEmpty"); if (empty) empty.style.display = n ? "none" : "";
+}
 let srchIdx = 0;
 function srchResults(q) {
   const mode = state.mode, out = [];
@@ -1361,7 +1381,7 @@ CUSTOMERS.forEach((c) => (c.currency = levelCur(levelOf(c.id))));
 document.querySelectorAll("[data-i]").forEach((el) => (el.outerHTML = ic(el.dataset.i)));
 $("#collapse").innerHTML = ic("chevL");
 $("#burger").innerHTML = ic("menu");
-$("#logoutBtn").innerHTML = ic("logout");
+$("#logoutBtn").innerHTML = ic("logout") + "<span>Çıkış yap</span>";
 $("#logoutBtn").onclick = authLogout;
 STORE.ready = storeInit().then(() => { if (authSession()) rerender(); });
 srchMount();
