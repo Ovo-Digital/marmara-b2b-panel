@@ -1363,7 +1363,6 @@ $("#collapse").innerHTML = ic("chevL");
 $("#burger").innerHTML = ic("menu");
 $("#logoutBtn").innerHTML = ic("logout");
 $("#logoutBtn").onclick = authLogout;
-cookieNotice();
 STORE.ready = storeInit().then(() => { if (authSession()) rerender(); });
 srchMount();
 $("#collapse").onclick = () => { $("#app").classList.toggle("mini"); $("#collapse").innerHTML = ic($("#app").classList.contains("mini") ? "chevR" : "chevL"); };
@@ -1373,3 +1372,4 @@ document.querySelectorAll("#modeSwitch button").forEach((b) => (b.onclick = () =
 $("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
 window.addEventListener("hashchange", render);
 render();
+setTimeout(() => { try { cookieNotice(); } catch (e) { console.warn(e); } });

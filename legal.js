@@ -184,20 +184,23 @@ const LEGAL = {
 
 // Metin, panel diline göre TR veya EN gösterilir (ES/DE/RU için İngilizce sürüm)
 function legalOpen(key) {
-  const d = LEGAL[key], lang = typeof LANG === "string" && LANG === "tr" ? "tr" : "en";
+  const d = LEGAL[key], cur = legalLang(), lang = cur === "tr" ? "tr" : "en";
   let box = document.getElementById("legalPop");
   if (!box) { document.body.insertAdjacentHTML("beforeend", `<div id="legalPop" class="legal-pop" onclick="if(event.target===this)legalClose()"></div>`); box = document.getElementById("legalPop"); }
   box.innerHTML = `<div class="legal-card notranslate"><div class="legal-head"><b>${d.title[lang]}</b><button class="icon-btn" onclick="legalClose()">${ic("x")}</button></div>
-    ${lang === "en" && LANG !== "en" ? `<p class="legal-note">English version</p>` : ""}<div class="legal-body">${d[lang]()}</div>
+    ${lang === "en" && cur !== "en" ? `<p class="legal-note">English version</p>` : ""}<div class="legal-body">${d[lang]()}</div>
     <div class="legal-links">${Object.keys(LEGAL).filter((k) => k !== key).map((k) => `<a onclick="legalOpen('${k}')">${LEGAL[k].title[lang]}</a>`).join("")}</div></div>`;
   box.classList.add("on");
   box.querySelector(".legal-body").scrollTop = 0;
 }
+// i18n.js henüz yüklenmemişse dili doğrudan kayıttan oku
+const legalLang = () => { try { return LANG; } catch { try { return localStorage.getItem("mbLang") || "tr"; } catch { return "tr"; } } };
 function legalClose() { document.getElementById("legalPop")?.classList.remove("on"); }
-const legalLinks = () => `<div class="legal-foot notranslate">${["kvkk", "privacy", "cookies", "terms"].map((k) => `<a onclick="legalOpen('${k}')">${LEGAL[k].title[typeof LANG === "string" && LANG === "tr" ? "tr" : "en"]}</a>`).join("")}</div>`;
+const legalLinks = () => `<div class="legal-foot notranslate">${["kvkk", "privacy", "cookies", "terms"].map((k) => `<a onclick="legalOpen('${k}')">${LEGAL[k].title[legalLang() === "tr" ? "tr" : "en"]}</a>`).join("")}</div>`;
 
 // Çerez bilgilendirmesi (yalnızca zorunlu depolama → bilgilendirme yeterli)
 function cookieNotice() {
   try { if (localStorage.getItem("mbCookieOk")) return; } catch { return; }
+  const LANG = legalLang();
   document.body.insertAdjacentHTML("beforeend", `<div class="cookie-bar notranslate" id="cookieBar"><span>${LANG === "tr" ? "Bu site yalnızca çalışması için gerekli tarayıcı depolamasını kullanır; reklam veya izleme çerezi yoktur." : "This site only uses browser storage that is strictly necessary; no advertising or tracking cookies."}</span><a onclick="legalOpen('cookies')">${LANG === "tr" ? "Çerez Politikası" : "Cookie Policy"}</a><button class="btn sm primary" onclick="try{localStorage.setItem('mbCookieOk','1')}catch{};this.parentNode.remove()">${LANG === "tr" ? "Tamam" : "OK"}</button></div>`);
 }

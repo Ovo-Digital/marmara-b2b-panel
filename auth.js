@@ -34,7 +34,7 @@ function authGuard() {
 
 async function authLogin() {
   const u = $("#auU").value.trim().toLocaleLowerCase("tr"), p = $("#auP").value;
-  const err = (m) => { $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
+  const err = (m) => { $("#auErr").className = "auth-err"; $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
   await STORE.ready;
   const acc = ACCOUNTS.find((a) => a.u === u && a.p === p);
   const h = await authHash(u, p);
@@ -43,7 +43,11 @@ async function authLogin() {
   if (reg) {
     const c = C(reg.cust);
     if (!c) return err("Kullanıcı adı veya şifre hatalı");
-    if (c.status !== "Active") return err("Hesabınız onay bekliyor. Onaylanınca giriş yapabilirsiniz.");
+    if (c.status !== "Active") {
+      const box = $("#auErr"); box.className = "auth-err pending"; box.style.display = "flex";
+      box.innerHTML = `${ic("clock")}<span><b>Bilgileriniz doğru.</b> Başvurunuz ekibimiz tarafından inceleniyor; onaylandığında bu bilgilerle giriş yapabilirsiniz.</span>`;
+      return;
+    }
     authSet(AUTH_KEY, { u, role: "customer", cust: c.id, name: c.contact, title: c.name });
   } else authSet(AUTH_KEY, { u: acc.u, role: acc.role, cust: acc.cust, name: acc.name, title: acc.title, dash: acc.dash });
   const s = authSession();

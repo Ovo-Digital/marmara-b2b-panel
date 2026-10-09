@@ -430,6 +430,8 @@ body.auth-on .app, body.auth-on .rv-fab, body.auth-on .rv-banner { display: none
 .auth-card { width: min(400px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,.05); }
 .auth-card.wide { width: min(640px, 100%); }
 .auth-card h1 { margin: 0 0 22px; font-size: 24px; letter-spacing: -.02em; }
+.auth-err.pending { color: var(--info); background: var(--info-bg); gap: 10px; align-items: flex-start; line-height: 1.5; }
+.auth-err.pending svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 2; }
 .auth-err { display: none; color: var(--err); background: var(--err-bg); border-radius: 8px; padding: 9px 12px; font-size: 13px; }
 .auth-link { text-align: center; font-size: 13px; color: var(--muted); cursor: pointer; }
 .auth-link:hover { color: var(--text); }
