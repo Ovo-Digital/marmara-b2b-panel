@@ -629,15 +629,15 @@ ADMIN.order = (no) => {
     <button class="btn ghost block mt" onclick="advance('${no}',-1)">Satışa geri gönder</button>`;
   else if (o.stage === 2) action = `<div class="card-h"><h3>Ödeme</h3><span class="pill ${ps[1]}">${ps[2]}</span></div>
     <div class="stat-row"><span>Proforma</span><b>PI-${no.slice(3)} / Rev.1</b></div><div class="stat-row"><span>Alınan</span><b>${money(o.paid, o.currency)}</b></div><div class="stat-row"><span>Bakiye</span><b class="warn-t">${money(total - o.paid, o.currency)}</b></div>
-    <button class="btn gold block mt" onclick="go('admin/finance')">${ic("wallet")} Ödeme Ekle</button>
+    <button class="btn gold block mt" onclick="go('admin/finance/${no}')">${ic("wallet")} Ödeme Ekle</button>
     <button class="btn danger block mt" onclick="advance('${no}');toast('Ödemesiz serbest bırakıldı — kritik yetki, audit log’a yazıldı','shield')">Ödemesiz Serbest Bırak</button>`;
   else if (o.stage === 3) action = `<div class="card-h"><h3>Fabrikada</h3><span class="pill info">Hazırlanıyor</span></div>
     ${o.problem ? `<div class="notice err">${ic("alert")}<span><b>Hazırlık problemi:</b> BC-400-2 için 103 koli gerekli, 101 bulundu. Müşteriye otomatik gösterilmez.</span></div>` : ""}
     <div class="stat-row"><span>Rezervasyon bitişi</span><b class="${o.problem ? "err-t" : ""}">${o.reserveUntil}</b></div>
     <div class="row mt"><button class="btn sm" onclick="toast('Rezervasyon 7 gün uzatıldı')">Extend</button><button class="btn sm danger" onclick="toast('Rezervasyon serbest bırakıldı','alert')">Release</button></div>
     <button class="btn block mt" onclick="go('factory/prep/${no}')">${ic("factory")} Hazırlık ekranını aç</button>`;
-  else if (o.stage === 4) action = `<div class="card-h"><h3>Sevke Hazır</h3><span class="pill ok">Final packing onaylı</span></div><button class="btn gold block lg" onclick="go('admin/shipments')">${ic("truck")} Sevkiyatı kapat</button>`;
-  else action = `<div class="card-h"><h3>Sevk Edildi</h3><span class="pill plain">Tamamlandı</span></div><div class="stat-row"><span>Forwarder</span><b>ABC Logistics</b></div><div class="stat-row"><span>Referans</span><b class="mono">BK-12345</b></div><div class="stat-row"><span>Konteyner</span><b class="mono">TCLU 482113-7</b></div>`;
+  else if (o.stage === 4) action = `<div class="card-h"><h3>Sevke Hazır</h3><span class="pill ok">Final packing onaylı</span></div><button class="btn gold block lg" onclick="go('admin/shipments/${no}')">${ic("truck")} Sevkiyatı kapat</button>`;
+  else action = `<div class="card-h"><h3>Sevk Edildi</h3><span class="pill plain">Tamamlandı</span></div><div class="stat-row"><span>Forwarder</span><b>${o.ship?.fwd || "ABC Logistics"}</b></div><div class="stat-row"><span>Referans</span><b class="mono">${o.ship?.ref || "BK-12345"}</b></div><div class="stat-row"><span>Konteyner</span><b class="mono">${o.ship?.plate || "TCLU 482113-7"}</b></div>`;
 
   return `${head(`${no}`, `${c.flag} ${c.name} · ${money(total, o.currency)} · ${targetLabel(o.target)}`, `${stagePill(o.stage)}${docButtons(o)}<button class="btn" onclick="go('admin/loading/${no}')">${ic("container")} Yükleme Planı</button>`, `<a href="#/admin/orders">Siparişler</a> / ${no}`)}
   <div class="card">${stepper(o.stage, STAGES)}</div>
@@ -901,32 +901,45 @@ function prepTable(factory) {
 }
 
 // ——— Sevkiyat ———
-ADMIN.shipments = () => {
-  const o = O("SO-2026-0144"), L = loadCalc(o.items, o.target);
-  return `${head("Sevkiyat", "")}
-  <div class="card" style="margin-bottom:18px"><div class="row wrap" style="gap:14px;font:500 13px var(--display);letter-spacing:.08em;text-transform:uppercase"><span class="ok-t">Preparation Completed</span><span class="dim">→</span><span class="gold-t">Confirm Final Packing</span><span class="dim">→</span><span>Ready for Shipment</span><span class="dim">→</span><span>Mark as Shipped</span></div></div>
+ADMIN.shipments = (arg) => {
+  const ready = ORDERS.filter((x) => x.stage === 4);
+  if (arg) state.shipOrder = arg;
+  const o = ready.find((x) => x.no === state.shipOrder) || ready[0];
+  const shipped = ORDERS.filter((x) => x.stage === 5);
+  const list = `<div class="card mt"><div class="card-h"><h3>Son Sevkiyatlar</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sipariş</th><th>Müşteri</th><th>Tip</th><th>Forwarder</th><th>Referans</th><th>Pickup</th></tr></thead><tbody>
+    ${shipped.map((x) => `<tr class="click" onclick="go('admin/order/${x.no}')"><td class="mono">${x.no}</td><td>${C(x.cust).flag} ${C(x.cust).name}</td><td>${x.ship?.type || targetLabel(x.target)}</td><td>${x.ship?.fwd || "—"}</td><td class="mono">${x.ship?.ref || "—"}</td><td>${x.ship?.date || x.date}</td></tr>`).join("")}</tbody></table></div></div>`;
+  if (!o) return `${head("Sevkiyat", "")}<div class="card"><div class="empty">Sevke hazır sipariş yok.</div></div>${list}`;
+  const L = loadCalc(o.items.map(([s, b]) => [s, o.shipped?.[s] ?? b]), o.target);
+  return `${head("Sevkiyat", "", ready.length > 1 ? `<select class="input" style="width:280px" onchange="go('admin/shipments/'+this.value)">${ready.map((x) => `<option value="${x.no}" ${x.no === o.no ? "selected" : ""}>${x.no} · ${C(x.cust).name}</option>`).join("")}</select>` : "")}
+  <div class="card" style="margin-bottom:18px"><div class="row wrap" style="gap:14px;font:500 13px var(--display);letter-spacing:.08em;text-transform:uppercase"><span class="ok-t">Preparation Completed</span><span class="dim">→</span><span class="${o.packed ? "ok-t" : "gold-t"}">Confirm Final Packing</span><span class="dim">→</span><span class="${o.packed ? "gold-t" : ""}">Ready for Shipment</span><span class="dim">→</span><span>Mark as Shipped</span></div></div>
   <div class="grid g2">
-    <div class="card"><div class="card-h"><h3>Final Packing — ${o.no}</h3><span class="pill ok">Hazırlık tamam</span></div>
+    <div class="card"><div class="card-h"><h3>Final Packing — <a href="#/admin/order/${o.no}">${o.no}</a></h3><span class="pill ok">Hazırlık tamam</span></div>
       <div class="stat-row"><span>Müşteri</span><b>${C(o.cust).flag} ${C(o.cust).name}</b></div>
       <div class="stat-row"><span>Yükleme</span><b>${targetLabel(o.target)}</b></div><div class="stat-row"><span>Final palet</span><b>${L.pallets.length}</b></div><div class="stat-row"><span>Loose koli</span><b>${num(L.looseBoxes)}</b></div><div class="stat-row"><span>Toplam koli</span><b>${num(L.boxes)}</b></div>
-      <div class="stat-row"><span>Net / Brüt</span><b>${num(Math.round(L.kg * 0.9))} / ${num(L.kg)} kg</b></div><div class="stat-row"><span>Packing List</span><b class="ok-t">Oluşturuldu ✓</b></div>
+      <div class="stat-row"><span>Net / Brüt</span><b>${num(Math.round(L.kg * 0.9))} / ${num(L.kg)} kg</b></div><div class="stat-row"><span>Packing List</span><a class="strong" onclick="openDoc('${o.no}','pl')">Aç ✓</a></div>
       <label class="checks"><label><input type="checkbox"> Kısmi sevkiyat (Shipment 1 / Shipment 2)</label></label>
-      <button class="btn ok block lg" onclick="toast('Final packing onaylandı · Sevke Hazır')">Final Packing'i Onayla</button></div>
+      <button class="btn ok block lg" ${o.packed ? "disabled" : ""} onclick="O('${o.no}').packed=true;log('${o.no}','Final packing onaylandı');toast('Final packing onaylandı · Sevke Hazır');rerender()">${o.packed ? "Final packing onaylı ✓" : "Final Packing'i Onayla"}</button></div>
     <div class="card flat"><div class="card-h"><h3>Sevkiyat Bilgileri</h3></div>
       <div class="form cols2">
-        <div class="field"><label>Pickup Date</label><input class="input" type="date" value="2026-10-02"></div>
-        <div class="field"><label>Transport Type</label><select class="input"><option>Truck</option><option>20' Container</option><option>40' Container</option><option>Air</option><option>Courier</option></select></div>
-        <div class="field"><label>Forwarder</label><input class="input" value="ABC Logistics"></div>
-        <div class="field"><label>Booking Reference</label><input class="input" value="BK-12345"></div>
-        <div class="field span2"><label>Container / Plate</label><input class="input" placeholder="TCLU… / 81 ABC 123"></div>
+        <div class="field"><label>Pickup Date</label><input class="input" id="shDate" type="date" value="${iso(addDays(new Date(), 2))}"></div>
+        <div class="field"><label>Transport Type</label><select class="input" id="shType">${["Truck", "20' Container", "40' Container", "Air", "Courier"].map((x) => `<option value="${x}" ${(o.target === "20" && x === "20' Container") || (o.target === "40" && x === "40' Container") ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>Forwarder</label><input class="input" id="shFwd" placeholder="ABC Logistics"></div>
+        <div class="field"><label>Booking Reference</label><input class="input" id="shRef" placeholder="BK-…"></div>
+        <div class="field span2"><label>Container / Plate</label><input class="input" id="shPlate" placeholder="TCLU… / 81 ABC 123"></div>
         <div class="field span2"><label>Müşteriye görünür dokümanlar</label><div class="checks"><label><input type="checkbox" checked> Final Packing List</label><label><input type="checkbox" checked> Commercial Invoice</label><label><input type="checkbox"> İç not</label></div></div>
       </div>
-      <button class="btn gold block lg mt" onclick="O('SO-2026-0144').stage=5;toast('Sevk edildi · müşteriye mail + dokümanlar gönderildi','truck');go('admin/orders')">${ic("truck")} Sevk Edildi Olarak İşaretle</button></div>
-  </div>
-  <div class="card mt"><div class="card-h"><h3>Son Sevkiyatlar</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sipariş</th><th>Müşteri</th><th>Tip</th><th>Forwarder</th><th>Referans</th><th>Pickup</th></tr></thead><tbody>
-    <tr><td class="mono">SO-2026-0143</td><td>🇸🇦 Riyadh Grooming Est.</td><td>20' DC</td><td>Arkas</td><td class="mono">ARK-88121</td><td>12 Sep 2026</td></tr>
-    <tr><td class="mono">SO-2026-0142</td><td>🇩🇪 ABC Distribution GmbH</td><td>Truck · 4 palet</td><td>Ekol</td><td class="mono">EK-20931</td><td>09 Sep 2026</td></tr></tbody></table></div></div>`;
+      <button class="btn gold block lg mt" ${o.packed ? "" : "disabled"} onclick="markShipped('${o.no}')">${ic("truck")} Sevk Edildi Olarak İşaretle</button></div>
+  </div>${list}`;
 };
+function markShipped(no) {
+  const o = O(no), v = (id) => $("#" + id).value.trim();
+  if (!v("shFwd") || !v("shRef")) { toast("Forwarder ve booking referansı girin", "alert"); return; }
+  o.ship = { date: fmtDate(v("shDate") || new Date()), type: v("shType"), fwd: v("shFwd"), ref: v("shRef"), plate: v("shPlate") };
+  o.stage = 5;
+  log(no, `Sevk edildi · ${o.ship.type} · ${o.ship.fwd} · ${o.ship.ref}`);
+  toast("Sevk edildi · müşteriye mail + dokümanlar gönderildi", "truck");
+  go("admin/order/" + no);
+}
 
 // ——— Finans ———
 function paymentsTable(list) {
@@ -934,27 +947,31 @@ function paymentsTable(list) {
   ${list.filter((o) => o.stage >= 2).map((o) => { const t = orderTotal(o), ps = payState(o); return `<tr><td class="mono">${o.no}</td><td class="mono muted">PI-${o.no.slice(3)} / Rev.1</td><td class="r">${money(t, o.currency)}</td><td class="r">${money(o.paid, o.currency)}</td><td class="r strong">${money(Math.max(0, t - o.paid), o.currency)}</td><td><span class="pill ${ps[1]}">${ps[2]}</span></td></tr>`; }).join("")}
   </tbody></table></div>`;
 }
-ADMIN.finance = () => {
-  const o = O("SO-2026-0146"), t = orderTotal(o), ps = payState(o);
-  return `${head("Finans & Ödemeler", "")}
-  <div class="grid g4">${kpi("$17,590", "Açık Bakiye", "3 sipariş", "wallet")}${kpi("$386,200", "Eylül Tahsilat", "22 ödeme", "check")}${kpi("5", "Ödeme Bekleyen", "Proforma gönderildi", "clock")}${kpi("$1,250", "Customer Credit", "Fazla ödemeler", "bank")}</div>
+ADMIN.finance = (arg) => {
+  const payable = ORDERS.filter((x) => x.stage >= 2 && x.stage < 5);
+  if (arg) state.finOrder = arg;
+  const o = O(state.finOrder) && O(state.finOrder).stage >= 2 ? O(state.finOrder) : payable.find((x) => x.paid + 1 < orderTotal(x)) || payable[0] || ORDERS.find((x) => x.stage >= 2);
+  const t = orderTotal(o), ps = payState(o), pi = `PI-${o.no.slice(3)}`;
+  const openBal = ORDERS.filter((x) => x.stage >= 2).reduce((s, x) => s + Math.max(0, orderTotal(x) - x.paid), 0);
+  return `${head("Finans & Ödemeler", "", `<select class="input" style="width:280px" onchange="go('admin/finance/'+this.value)">${ORDERS.filter((x) => x.stage >= 2).map((x) => `<option value="${x.no}" ${x.no === o.no ? "selected" : ""}>${x.no} · ${C(x.cust).name} · ${payState(x)[2]}</option>`).join("")}</select>`)}
+  <div class="grid g4">${kpi(money(Math.round(openBal)), "Açık Bakiye", "", "wallet")}${kpi("$386,200", "Eylül Tahsilat", "22 ödeme", "check")}${kpi(ORDERS.filter((x) => x.stage === 2).length, "Ödeme Bekleyen", "Proforma gönderildi", "clock")}${kpi("$1,250", "Customer Credit", "Fazla ödemeler", "bank")}</div>
   <div class="grid g2 mt">
-    <div class="card"><div class="card-h"><h3>Proforma Invoice</h3><span class="pill plain">PI-2026-0146 / Rev.1</span></div>
-      <div class="stat-row"><span>Müşteri</span><b>${C(o.cust).flag} ${C(o.cust).name}</b></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Sipariş toplamı</span><b>${money(t, o.currency)}</b></div><div class="stat-row"><span>Ödeme şartı</span><b>100% Advance</b></div>
+    <div class="card"><div class="card-h"><h3>Proforma Invoice</h3><span class="pill plain">${pi} / Rev.1</span></div>
+      <div class="stat-row"><span>Sipariş</span><a class="strong mono" href="#/admin/order/${o.no}">${o.no}</a></div><div class="stat-row"><span>Müşteri</span><b>${C(o.cust).flag} ${C(o.cust).name}</b></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Sipariş toplamı</span><b>${money(t, o.currency)}</b></div><div class="stat-row"><span>Ödeme şartı</span><b>100% Advance</b></div>
       <div class="card flat mt"><div class="between"><b style="font:500 13px var(--display);letter-spacing:.08em">BANKA — ${o.currency} VARSAYILAN</b><span class="pill ok plain">Otomatik</span></div><p class="muted mono" style="margin:8px 0 0">Bank A · ${o.currency} Account · TR12 0001 2345 6789 0000 0001 · SWIFT TGBATRIS</p></div>
-      <div class="row mt"><button class="btn gold" onclick="toast('PI PDF oluşturuldu','download')">${ic("download")} PDF Oluştur</button><button class="btn warn" onclick="newRevision()">Yeni Revizyon</button></div>
+      <div class="row mt"><button class="btn gold" onclick="openDoc('${o.no}','pi')">${ic("download")} PDF Oluştur</button><button class="btn warn" onclick="newRevision()">Yeni Revizyon</button></div>
       <div class="section-title">Revizyon Geçmişi</div>
-      ${state.piRevs.slice().reverse().map(([r, d, n], i) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} PI-2026-0146 / ${r} <small class="muted">· ${n}</small></span><span class="row"><small class="muted">${d}</small>${i === 0 ? '<span class="pill ok plain">Güncel</span>' : ""}</span></div>`).join("")}</div>
+      ${state.piRevs.slice().reverse().map(([r, d, n], i) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${pi} / ${r} <small class="muted">· ${n}</small></span><span class="row"><small class="muted">${d}</small>${i === 0 ? '<span class="pill ok plain">Güncel</span>' : ""}</span></div>`).join("")}</div>
     <div class="card flat"><div class="card-h"><h3>Ödeme</h3><span class="pill ${ps[1]}">${ps[2]}</span></div>
       <div class="grid g2"><div><div class="muted">Alınan</div><div class="big-num">${money(o.paid, o.currency)}</div></div><div><div class="muted">Bakiye</div><div class="big-num warn-t">${money(t - o.paid, o.currency)}</div></div></div>
-      <div class="form cols2 mt"><div class="field"><label>Tarih</label><input class="input" type="date" value="2026-09-30"></div><div class="field"><label>Tutar</label><input class="input" value="${Math.round(t - o.paid)}"></div>
+      <div class="form cols2 mt"><div class="field"><label>Tarih</label><input class="input" type="date" value="2026-09-30"></div><div class="field"><label>Tutar</label><input class="input" id="payAmt" value="${Math.max(0, Math.round((t - o.paid) * 100) / 100)}"></div>
       <div class="field"><label>Para Birimi</label><select class="input"><option value="${o.currency}">${o.currency}</option></select></div><div class="field"><label>Banka</label><select class="input"><option>Bank A · ${o.currency}</option></select></div>
       <div class="field span2"><label>SWIFT / Referans</label><input class="input" placeholder="…"></div><div class="field span2"><label>Dekont</label><button class="btn">${ic("upload")} Dosya yükle</button></div></div>
       <div class="section-title">Siparişlere Dağıt</div>
-      <div class="stat-row"><span>SO-2026-0146 · bakiye ${money(t - o.paid, o.currency)}</span><input class="input alloc" style="width:110px;height:34px" value="${Math.round(t - o.paid)}" oninput="allocCalc()"></div>
+      <div class="stat-row"><span>${o.no} · bakiye ${money(t - o.paid, o.currency)}</span><input class="input alloc" style="width:110px;height:34px" value="${Math.round(t - o.paid)}" oninput="allocCalc()"></div>
       <div class="stat-row"><span>SO-2026-0138 · bakiye €2,300</span><input class="input alloc" style="width:110px;height:34px" value="0" oninput="allocCalc()"></div>
       <div class="stat-row"><span>Customer Credit'e kalan</span><b id="allocRest">€0</b></div>
-      <button class="btn ok block lg mt" onclick="O('SO-2026-0146').paid=${Math.round(t)};O('SO-2026-0146').stage=3;toast('Ödeme eklendi · sipariş fabrika kuyruğuna düştü');rerender()">${ic("check")} Ödeme Ekle</button></div>
+      <button class="btn ok block lg mt" ${o.stage >= 5 ? "disabled" : ""} onclick="addPayment('${o.no}')">${ic("check")} Ödeme Ekle</button></div>
   </div>
   <div class="grid g-side mt"><div><div class="card"><div class="card-h"><h3>Ödeme Durumu</h3></div>${paymentsTable(ORDERS)}</div>
   <div class="card mt"><div class="card-h"><h3>Müşteri Cari</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Müşteri</th><th>Döviz</th><th class="r">YTD Fatura</th><th class="r">Açık Bakiye</th><th class="r">Credit</th></tr></thead><tbody>
@@ -964,6 +981,16 @@ ADMIN.finance = () => {
   <div class="section-title">Öncelik</div><ol style="margin:0;padding-left:18px;line-height:2"><li>Müşteriye özel hesap</li><li>Para birimi varsayılanı</li><li>Yetkili manuel seçim</li></ol>
   </div></div>`;
 };
+function addPayment(no) {
+  const o = O(no), amt = Math.round((parseFloat(String($("#payAmt").value).replace(",", ".")) || 0) * 100) / 100;
+  if (amt <= 0) { toast("Geçerli bir tutar girin", "alert"); return; }
+  o.paid = Math.round((o.paid + amt) * 100) / 100;
+  const full = o.paid + 0.01 >= orderTotal(o);
+  log(no, `Ödeme eklendi: ${money(amt, o.currency, 2)} · toplam alınan ${money(o.paid, o.currency, 2)}${full && o.stage === 2 ? " · fabrika kuyruğuna gönderildi" : ""}`);
+  if (full && o.stage === 2) o.stage = 3;
+  toast(full ? "Ödeme tamamlandı · sipariş fabrika kuyruğuna düştü" : "Kısmi ödeme eklendi");
+  rerender();
+}
 function newRevision() { const n = "Rev." + (state.piRevs.length + 1); state.piRevs.push([n, "30 Sep 2026", "Admin revize"]); toast(`${n} oluşturuldu · önceki revizyon saklandı`); rerender(); }
 function allocCalc() {
   const paid = Number(document.querySelectorAll(".form.cols2 .input")[1].value) || 0;
