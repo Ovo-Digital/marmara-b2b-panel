@@ -772,7 +772,8 @@ const boxNet = (p) => p.net ?? +(p.kg * 0.86).toFixed(2);
 const boxGross = (p) => p.gross ?? p.kg;
 function docData(no) {
   const o = O(no), c = C(o.cust);
-  const rows = o.items.map(([sku, b, pr]) => {
+  const ord = (sku) => { const i = PRODUCTS.findIndex((x) => x.sku === sku); return i < 0 ? 1e9 : i; };
+  const rows = o.items.slice().sort((a, b) => ord(a[0]) - ord(b[0])).map(([sku, b, pr]) => {
     const p = P(sku) || { sku, name: sku, pcsBox: 1, kg: 0, dims: [0, 0, 0], hs: "", ean: "" };
     const q = o.shipped?.[sku] ?? b, up = pr ?? orderPrice(o, p);
     return { p, sku, q, pcs: q * p.pcsBox, up, line: q * p.pcsBox * up, net: q * boxNet(p), gross: q * boxGross(p), cbm: (q * p.dims[0] * p.dims[1] * p.dims[2]) / 1e6 };
@@ -1122,7 +1123,7 @@ ADMIN.product = (sku) => {
     <div class="card" style="padding:0;overflow:hidden;background:#f3f3f1;display:grid;place-items:center;min-height:240px">${p.img ? `<img src="${imgSrc(p.img)}" style="max-width:70%;max-height:220px">` : noImg(p)}</div>
     <div class="card"><div class="card-h"><h3>Genel</h3></div><dl class="dl" style="grid-template-columns:90px 1fr"><dt>SKU</dt><dd class="mono">${p.sku}</dd><dt>EAN</dt><dd class="mono">${p.ean}</dd><dt>Marka</dt><dd>${p.brand}</dd><dt>Kategori</dt><dd>${p.cat}</dd><dt>Varyant</dt><dd>${pxVariant(p)}</dd><dt>Durum</dt><dd>Aktif</dd></dl></div>
     <div class="card"><div class="card-h"><h3>Paketleme & Lojistik</h3></div><dl class="dl" style="grid-template-columns:110px 1fr"><dt>pcs / koli</dt><dd>${p.pcsBox}</dd><dt>Koli L×W×H</dt><dd>${p.dims.join(" × ")} cm</dd><dt>Koli CBM</dt><dd>${bv.toFixed(4)} m³</dd><dt>Birim ağırlık</dt><dd>${p.unitKg != null ? p.unitKg + " kg" : "—"}</dd><dt>Koli net</dt><dd>${p.net != null ? p.net + " kg" : (p.kg * 0.86).toFixed(1) + " kg (tahmini)"}</dd><dt>Sınıf</dt><dd>${p.cls}</dd><dt>İstif</dt><dd>${pxStack(p)}</dd><dt>Yön</dt><dd>${pxOrient(p)}</dd><dt>Loose loading</dt><dd class="${p.loose ? "ok-t" : "muted"}">${p.loose ? "Allowed" : "Not allowed"}</dd></dl></div>
-    <div class="card"><div class="card-h"><h3>Ticaret / Uyum</h3></div><dl class="dl" style="grid-template-columns:90px 1fr"><dt>GTİP</dt><dd class="mono">${p.gtip || p.hs || "—"}</dd><dt>Menşe</dt><dd>${p.origin}</dd><dt>DG / UN</dt><dd>${p.dg}</dd><dt>IMDG</dt><dd>${pxImdg(p)}</dd><dt>Flash point</dt><dd>${pxFlash(p)}</dd><dt>Doküman</dt><dd>${DOCUMENTS.filter((d) => d.sku === p.sku || d.sku === "All").length} adet</dd></dl></div>
+    <div class="card"><div class="card-h"><h3>Ticaret / Uyum</h3></div><dl class="dl" style="grid-template-columns:90px 1fr"><dt>GTİP</dt><dd class="mono">${p.gtip || p.hs || "—"}</dd><dt>Menşe</dt><dd>${p.origin}</dd></dl></div>
   </div>
   <div class="card mt"><div class="card-h"><h3>Fiyatlar</h3><span class="sub">Birim fiyat · değişiklik yeni siparişlerde geçerli</span></div>
     <div class="price-grid">${LEVELS.map((l, i) => `<label><small>${l.name} · ${l.cur}</small><input class="input" type="number" min="0" step="0.0001" id="pr${l.id}" value="${p.prices[i] ?? ""}"></label>`).join("")}</div>
