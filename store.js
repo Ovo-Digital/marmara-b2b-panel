@@ -12,12 +12,12 @@ const PRODUCTS_BASE = JSON.stringify(PRODUCTS);
 const storeUrl = () => STORE.api + (STORE.ns ? `?ns=${encodeURIComponent(STORE.ns)}` : "");
 
 function storeSnapshot() {
-  const s = { orders: {}, customers: {}, regs: {}, products: {}, logs: {}, prep: {}, palletCheck: {} };
+  const s = { orders: {}, customers: {}, regs: {}, products: {}, logs: {}, prep: {}, palletCheck: {}, meta: {} };
   ORDERS.forEach((o) => (s.orders[o.no] = JSON.stringify(o)));
   CUSTOMERS.forEach((c) => (s.customers[c.id] = JSON.stringify(c)));
   STORE.regs.forEach((r) => (s.regs[r.u] = JSON.stringify(r)));
   PRODUCTS.forEach((p) => (s.products[p.sku] = JSON.stringify(p)));
-  for (const m of ["logs", "prep", "palletCheck"]) for (const [k, v] of Object.entries(state[m] || {})) s[m][k] = JSON.stringify(v);
+  for (const m of ["logs", "prep", "palletCheck", "meta"]) for (const [k, v] of Object.entries(state[m] || {})) s[m][k] = JSON.stringify(v);
   return s;
 }
 function storeChanges() {
@@ -27,7 +27,7 @@ function storeChanges() {
   for (const c of CUSTOMERS) if (now.customers[c.id] !== STORE.snap.customers[c.id]) put("customers", c);
   for (const r of STORE.regs) if (now.regs[r.u] !== STORE.snap.regs[r.u]) put("regs", r);
   for (const p of PRODUCTS) if (now.products[p.sku] !== STORE.snap.products[p.sku]) put("products", p);
-  for (const m of ["logs", "prep", "palletCheck"]) for (const [k, v] of Object.entries(now[m])) if (v !== STORE.snap[m][k]) (ch[m] ||= {})[k] = state[m][k];
+  for (const m of ["logs", "prep", "palletCheck", "meta"]) for (const [k, v] of Object.entries(now[m])) if (v !== STORE.snap[m][k]) (ch[m] ||= {})[k] = state[m][k];
   return Object.keys(ch).length ? ch : null;
 }
 function storeApply(doc) {
@@ -37,7 +37,7 @@ function storeApply(doc) {
   const prods = JSON.parse(PRODUCTS_BASE);
   for (const p of doc.products || []) { const i = prods.findIndex((x) => x.sku === p.sku); if (i >= 0) prods[i] = p; else prods.push(p); }
   PRODUCTS.splice(0, PRODUCTS.length, ...prods);
-  state.logs = doc.logs || {}; state.prep = doc.prep || {}; state.palletCheck = doc.palletCheck || {};
+  state.logs = doc.logs || {}; state.prep = doc.prep || {}; state.palletCheck = doc.palletCheck || {}; state.meta = doc.meta || {};
   STORE.rev = doc.rev; STORE.snap = storeSnapshot();
 }
 async function storeFetch(opts) {
@@ -53,7 +53,7 @@ async function storeInit() {
     const doc = await storeFetch();
     STORE.online = true;
     if (doc.rev > 0) storeApply(doc);
-    else { STORE.snap = { orders: {}, customers: {}, regs: {}, products: storeSnapshot().products, logs: {}, prep: {}, palletCheck: {} }; await storeSync(true); }
+    else { STORE.snap = { orders: {}, customers: {}, regs: {}, products: storeSnapshot().products, logs: {}, prep: {}, palletCheck: {}, meta: {} }; await storeSync(true); }
   } catch (e) {
     STORE.online = false; STORE.snap = storeSnapshot();
     console.warn("Ortak depoya ulaşılamadı, yerel veriyle devam:", e.message);

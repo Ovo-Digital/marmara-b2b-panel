@@ -144,4 +144,5 @@ def main():
         for bc, a, b, sku in conflicts: f.write(f"{bc}  fiyat tablosu: {a}\n{' ' * len(bc)}  ürün listesi:  {b}  [{sku}]\n\n")
     print(len(conflicts), "barkod çakışması → tools/veri-cakismalari.txt")
 
-main()
+if __name__ == "__main__":
+    main()

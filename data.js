@@ -75,19 +75,39 @@ const MARKETING = [
 
 const USERS = [
   { name: "Volkan Koçkan", email: "volkan@ovodigi.com", role: "Super Admin", scope: "Tümü" },
-  { name: "Gözde", email: "gozde@marmarabarber.com", role: "Export Manager / Final Approver", scope: "Tümü" },
-  { name: "Ferhat", email: "ferhat@marmarabarber.com", role: "Export Sales", scope: "Kendi müşterileri" },
+  { name: "Gözde", email: "gozde@marmarabarber.com", role: "Super Admin", scope: "Tümü" },
+  { name: "Ferhat", email: "ferhat@marmarabarber.com", role: "Super Admin", scope: "Tümü" },
   { name: "Operasyon Ekibi", email: "ops@marmarabarber.com", role: "Operations", scope: "Tümü" },
   { name: "Finans", email: "finans@marmarabarber.com", role: "Finance", scope: "Tümü" },
   { name: "Regülasyon", email: "regulatory@marmarabarber.com", role: "Regulatory", scope: "Dokümanlar" },
 ];
 
+// Şirket bilgileri — belgeler (proforma / invoice / packing list), İletişim sayfası ve yasal metinler buradan beslenir.
+// Kaynak: Senso'nun gönderdiği packing list ve proforma / invoice şablonları. [Köşeli parantezli] alanlar firmadan gelecek.
+const COMPANY = {
+  brand: "SENSO COSMETICS",
+  legal: "SENSO KOZMETİK ÜRN. TURZ. SAN. VE TİC. LTD. ŞTİ.",
+  address: "Baklacı Mah. Fatih Cad. Çevre Sok. No:20 Beykoz - Istanbul - TURKEY",
+  tax: "[Vergi dairesi / vergi no]",
+  phone: "+90 216 479 12 00",
+  fax: "+90 216 479 12 08",
+  email: "info@marmarabarber.com",            // proforma / invoice şablonundaki iletişim
+  web: "www.marmarab2b.com",
+  plEmail: "info@sensokozmetik.com.tr",        // packing list sabit satıcı bloğu
+  plWeb: "www.sensokozmetik.com.tr",
+};
+// Para birimine göre banka hesabı (belgelerde seçilen para biriminin hesabı görünür)
+const BANKS = {
+  USD: { bank: "[Banka adı / şube]", iban: "[USD hesap IBAN]", swift: "[SWIFT / BIC]" },
+  EUR: { bank: "[Banka adı / şube]", iban: "[EUR hesap IBAN]", swift: "[SWIFT / BIC]" },
+};
+
 // Müşteri › İletişim sayfası — [köşeli parantezli] alanlar firmadan gelecek bilgiyle doldurulacak
 const CONTACT = {
   company: "Senso Cosmetics",
-  email: "[İLETİŞİM E-POSTASI]",
-  phone: "[TELEFON]",
-  address: "[AÇIK ADRES], Düzce / Türkiye",
+  email: "info@marmarabarber.com",
+  phone: "+90 216 479 12 00",
+  address: "Baklacı Mah. Fatih Cad. Çevre Sok. No:20 Beykoz - Istanbul - TURKEY",
   hours: "Mon–Fri 09:00–18:00 (GMT+3)",
   reps: { Ferhat: { email: "ferhat@marmarabarber.com" } },
 };

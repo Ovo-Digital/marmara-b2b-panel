@@ -4,14 +4,14 @@
 const LEGAL_VERSION = "1.0";
 const LEGAL_DATE = { tr: "9 Ekim 2026", en: "9 October 2026" };
 const CO = {
-  name: "[ŞİRKET TİCARET UNVANI]",
+  name: "SENSO KOZMETİK ÜRN. TURZ. SAN. VE TİC. LTD. ŞTİ.",
   brand: "Senso Cosmetics",
-  address: "[AÇIK ADRES], Düzce / Türkiye",
+  address: "Baklacı Mah. Fatih Cad. Çevre Sok. No:20 Beykoz - İstanbul / Türkiye",
   mersis: "[MERSİS NO]",
   tax: "[VERGİ DAİRESİ / VERGİ NO]",
   email: "[KVKK BAŞVURU E-POSTASI]",
   kep: "[KEP ADRESİ]",
-  phone: "[TELEFON]",
+  phone: "+90 216 479 12 00",
   site: "marmara-b2b-panel.vercel.app",
 };
 const ph = (s) => (s.startsWith("[") ? `<mark class="legal-ph">${s}</mark>` : s);

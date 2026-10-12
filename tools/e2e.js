@@ -78,9 +78,9 @@
       const t = $("#view").innerText;
       ok(t.includes("streç") && t.includes(o.po), "sipariş detayında müşteri notu ve PO görünüyor");
       const pi = docHtml(o.no, "pi"), pl = docHtml(o.no, "pl");
-      ok(pi.includes(money(total, o.currency, 2)) && pi.includes(CO_NAME), `proforma toplamı ${money(total, o.currency, 2)} ve alıcı doğru`);
+      ok(pi.includes(n2(total)) && pi.includes(CO_NAME) && pi.includes(o.po) && pi.includes("PROFORMA INVOICE"), `proforma (şablon) toplamı ${n2(total)}, alıcı ve PO doğru`);
       const boxes = o.items.reduce((s, [, b]) => s + b, 0);
-      ok(pl.includes(`<b>${num(boxes)}</b>`), `packing list koli toplamı ${boxes}`);
+      ok(pl.includes(`<td>${boxes}</td>`) && pl.includes("INVOICE NO:</b> " + o.po), `packing list koli toplamı ${boxes}, invoice no = PO`);
       // başka cihazdan değişiklik → 15 sn yoklaması ekrana getiriyor mu
       const mod = { ...o, po: "E2E-PO-2" };
       await fetch(storeUrl(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes: { orders: [mod] } }) });
@@ -116,15 +116,15 @@
       ok(r.stage === 4, `hazırlık tamamlandı → depoda aşama ${r.stage} (Sevke Hazır)`);
     }
 
-    if (step === 6) {                       // ADMIN cihazı — final packing + sevk (sevkiyat bilgisi formu yok)
+    if (step === 6) {                       // ADMIN cihazı — sevk (sipariş detayından)
       await login("admin", "senso2026");
       const o = orderOf();
-      location.hash = "#/admin/shipments/" + o.no; await tick(400);
-      ok(!/Sevkiyat Bilgileri/.test($("#view").innerText), "sevkiyat bilgileri formu yok");
-      O(o.no).packed = true; log(o.no, "Final packing onaylandı"); rerender(); await tick(300);
-      markShipped(o.no); await tick(400); await settle();
+      location.hash = "#/admin/order/" + o.no; await tick(400);
+      ok(!document.querySelector('#nav [href="#/admin/shipments"]'), "menüde Sevkiyat yok; sevk sipariş detayından");
+      O(o.no).pallets = 2; rerender(); await tick(200);
+      [...document.querySelectorAll("#view button")].find((b) => /Sevk Edildi/.test(b.textContent)).click(); await tick(400); await settle();
       const d = await remote(), r = d.orders.find((x) => x.no === o.no);
-      ok(r.stage === 5 && !!r.ship?.date, `sevk edildi → depoda aşama ${r.stage} · ${r.ship?.date}`);
+      ok(r.stage === 5 && !!r.ship?.date && r.pallets === 2, `sevk edildi → depoda aşama ${r.stage} · ${r.ship?.date} · ${r.pallets} palet`);
       ok(d.logs[o.no]?.length >= 6, `aktivite log: ${d.logs[o.no]?.length} kayıt`);
     }
 
@@ -135,7 +135,7 @@
       ok(o.stage === 5 && /Shipped|Sevk/.test($("#view").innerText), "müşteri siparişi “Sevk Edildi” görüyor");
       ok(!!document.querySelector(`[onclick="openDoc('${o.no}','ci')"]`), "Commercial Invoice indirilebilir");
       const ci = docHtml(o.no, "ci");
-      ok(ci.includes(money(expected, "USD", 2)), `Commercial Invoice toplamı ${money(expected, "USD", 2)}`);
+      ok(ci.includes(n2(expected)) && ci.includes("COMMERCIAL INVOICE") && !ci.includes("DRAFT"), `Commercial Invoice toplamı ${n2(expected)}`);
       location.hash = "#/customer/orders"; await tick(400);
       ok(ORDERS.filter((x) => x.cust === o.cust).length === 1 && !$("#view").innerText.includes("ABC Distribution"), "müşteri sadece kendi siparişini görüyor");
     }
