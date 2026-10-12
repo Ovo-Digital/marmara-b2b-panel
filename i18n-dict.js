@@ -1,5 +1,13 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Final Proforma Invoice": {"tr":"Final Proforma Fatura","en":"Final Proforma Invoice","es":"Factura proforma final","de":"Finale Proforma-Rechnung","ru":"Окончательный проформа-счёт"},
+  "when ready to ship": {"tr":"sevke hazır olunca","en":"when ready to ship","es":"cuando esté listo para enviar","de":"bei Versandbereitschaft","ru":"когда будет готов к отправке"},
+  "after shipment": {"tr":"sevkiyattan sonra","en":"after shipment","es":"tras el envío","de":"nach Versand","ru":"после отправки"},
+  "View": {"tr":"Görüntüle","en":"View","es":"Ver","de":"Ansehen","ru":"Открыть"},
+  "Your final proforma invoice is ready — order #.": {"tr":"Final proforma faturanız hazır — sipariş #.","en":"Your final proforma invoice is ready — order #.","es":"Su factura proforma final está lista — pedido #.","de":"Ihre finale Proforma-Rechnung ist bereit — Auftrag #.","ru":"Окончательный проформа-счёт готов — заказ #."},
+  "Your order is ready to ship; please review the proforma and complete any remaining payment.": {"tr":"Siparişiniz sevke hazır; lütfen proformayı inceleyin ve varsa kalan ödemeyi tamamlayın.","en":"Your order is ready to ship; please review the proforma and complete any remaining payment.","es":"Su pedido está listo para enviar; revise la proforma y complete el pago pendiente.","de":"Ihre Bestellung ist versandbereit; bitte prüfen Sie die Proforma und begleichen Sie offene Beträge.","ru":"Заказ готов к отправке; проверьте проформу и оплатите остаток."},
+  "Your final proforma invoice is ready.": {"tr":"Final proforma faturanız hazır.","en":"Your final proforma invoice is ready.","es":"Su factura proforma final está lista.","de":"Ihre finale Proforma-Rechnung ist bereit.","ru":"Окончательный проформа-счёт готов."},
+  "You can view and download it under Documents.": {"tr":"Belgeler bölümünden görüntüleyip indirebilirsiniz.","en":"You can view and download it under Documents.","es":"Puede verla y descargarla en Documentos.","de":"Sie finden sie unter Dokumente.","ru":"Его можно открыть и скачать в разделе «Документы»."},
   "Edit details": {"tr":"Bilgileri düzenle","en":"Edit details","es":"Editar datos","de":"Daten bearbeiten","ru":"Изменить данные"},
   "Contact person": {"tr":"Yetkili kişi","en":"Contact person","es":"Persona de contacto","de":"Ansprechpartner","ru":"Контактное лицо"},
   "Commercial terms": {"tr":"Ticari şartlar","en":"Commercial terms","es":"Condiciones comerciales","de":"Handelsbedingungen","ru":"Коммерческие условия"},

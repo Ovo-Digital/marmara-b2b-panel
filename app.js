@@ -288,11 +288,13 @@ function render() {
   $("#notifBtn").style.display = mode === "admin" ? "" : "none";
   const un = actionUnread(); $("#notifBtn em").textContent = un; $("#notifBtn em").style.display = un ? "" : "none";
 
+  // müşteri bildirimi olan siparişi açtıysa: okundu say (menü rozeti bu çizimde düşsün)
+  if (mode === "customer" && page === "order") { const fo = O(arg); state.freshNotice = fo?.custNotice && !fo.custNotice.seen && sess?.role === "customer" ? (fo.custNotice.seen = true, arg) : state.freshNotice === arg ? arg : null; }
   const activeKey = { customer: "customers", order: "orders", application: "customers", product: "products", checkout: "products" }[page] || page;
   $("#nav").innerHTML = NAV[mode].map((n) => {
     if (n.length === 1) return `<div class="nav-group">${n[0]}</div>`;
     const [key, label, icon] = n;
-    const badge = mode === "admin" && key === "customers" ? CUSTOMERS.filter((c) => c.status === "Pending").length : mode === "admin" && key === "notifications" ? actionUnread() : n[3];
+    const badge = mode === "admin" && key === "customers" ? CUSTOMERS.filter((c) => c.status === "Pending").length : mode === "admin" && key === "notifications" ? actionUnread() : mode === "customer" && key === "orders" ? custNotices().length : n[3];
     return `<a class="nav-item ${key === activeKey ? "on" : ""}" href="#/${mode}/${key}" data-short="${label.split(" ")[0]}">${ic(icon)}<span>${label}</span>${badge ? `<span class="badge">${badge}</span>` : ""}</a>`;
   }).join("");
   $("#nav .nav-item.on")?.scrollIntoView({ block: "nearest" });
@@ -700,6 +702,7 @@ ADMIN.order = (no) => {
     <button class="btn gold block lg mt" onclick="finishPrep('${no}')">${ic("check")} Hazırlık tamamlandı · Sevke hazır</button>
     <button class="btn danger block mt" onclick="reportProblem('${no}')">${ic("alert")} Problem Bildir</button>`;
   else if (o.stage === 4) action = `<div class="card-h"><h3>Sevke Hazır</h3><span class="pill ok">Hazırlık tamam</span></div>
+    <div class="notice info" style="margin-bottom:10px">${ic("info")}<span>Müşteri final proformayı ve packing list’i görebiliyor${o.custNotice ? ` · bildirim ${o.custNotice.at}${o.custNotice.seen ? " · görüldü ✓" : ""}` : ""}.</span></div>
     <div class="field"><label>Palet sayısı <small class="muted">(packing list için)</small></label><input class="input" type="number" min="0" value="${o.pallets ?? ""}" placeholder="—" onchange="O('${no}').pallets=this.value===''?null:Math.max(0,parseInt(this.value)||0);rerender()"></div>
     <div class="row mt">${plButtons(no)}</div>
     <button class="btn gold block lg mt" onclick="markShipped('${no}')">${ic("truck")} Sevk Edildi Olarak İşaretle</button>`;
@@ -806,7 +809,7 @@ function docHtml(no, type) {
   return `<!doctype html><html><head><meta charset=utf-8><title>${title} ${docNo}</title><style>${DOC_CSS}
     @page{size:A4;margin:14mm 14mm 16mm;@bottom-left{content:"${COMPANY.brand}  |  ${title}  ${docNo}";font:8pt Inter,Arial,sans-serif;color:#6b7a86}@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Inter,Arial,sans-serif;color:#6b7a86}}
     @page :not(:first){@top-left{content:"${COMPANY.brand}  ·  ${title}  ·  ${docNo}";font:600 8pt Inter,Arial,sans-serif;color:#1f3644}}
-  </style></head><body><div class="tools"><button onclick="print()">Print / Save PDF</button></div><div class="sheet">
+  </style></head><body><div class="tools"><button onclick="pdfDownload()">Download PDF</button><button onclick="print()">Print</button></div>${pdfScript(docNo, "portrait")}<div class="sheet">
   <header class="dh"><div class="brand"><img src="${new URL("senso-logo.png", location.href).href}" alt="Senso"><div><b>${COMPANY.brand}</b><span>${COMPANY.legal}</span><span>${COMPANY.address}</span><span>Tax Office / Tax ID: ${phx(COMPANY.tax)}</span></div></div>
     <div class="dt"><h1>${title}</h1>${draft ? `<span class="draft">DRAFT — ${isPI ? "pending final approval" : "not yet shipped"}</span>` : ""}</div></header>
   <div class="contact">${COMPANY.phone}  |  ${COMPANY.email}  |  ${COMPANY.web}</div>
@@ -829,6 +832,12 @@ function docHtml(no, type) {
   <footer class="sf"><span>${COMPANY.brand}  |  ${title}  ${docNo}</span></footer>
   </div></body></html>`;
 }
+// Belge penceresinde doğrudan PDF indirme (html2pdf: sayfa A4, satırlar ve kapanış bloğu bölünmez)
+const pdfScript = (file, orient) => `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script><script>
+function pdfDownload(){const b=document.querySelector(".tools");if(!window.html2pdf){alert("PDF aracı yüklenemedi, internet bağlantısını kontrol edin.");return;}
+b.style.display="none";const el=document.querySelector(".sheet"),st=el.getAttribute("style")||"";el.style.boxShadow="none";el.style.margin="0";
+html2pdf().set({margin:[8,0,10,0],filename:${JSON.stringify(String(file).replace(/[^\w.-]+/g, "_") + ".pdf")},image:{type:"jpeg",quality:0.96},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"${orient}"},pagebreak:{mode:["css","legacy"],avoid:["tr",".closing",".parties",".meta"]}}).from(el).save().then(()=>{el.setAttribute("style",st);b.style.display="";});}
+<\/script>`;
 const DOC_CSS = `*{box-sizing:border-box}body{margin:0;background:#e9ecef;font:10.5pt/1.45 Inter,"Helvetica Neue",Arial,sans-serif;color:#1f2a33}
   .tools{position:fixed;right:18px;bottom:18px;display:flex;gap:8px;z-index:5}.tools button{padding:10px 16px;border:0;border-radius:8px;background:#1f3644;color:#fff;font:600 13px Inter,Arial,sans-serif;cursor:pointer}
   .sheet{width:210mm;min-height:297mm;margin:24px auto;background:#fff;padding:16mm 14mm 14mm;box-shadow:0 4px 30px rgba(0,0,0,.12)}
@@ -866,7 +875,7 @@ function plHtml(no) {
     .inv{text-align:right;margin:-10px 0 14px}.pl table{width:100%;border-collapse:collapse}.pl th{background:#b7b7b7;border:1px solid #444;padding:6px;font-size:9.5pt}.pl td{border:1px solid #444;padding:4px 6px;font-size:9pt}
     .pl .tot td{background:#b7b7b7;font-weight:700;text-align:center}.pl tr{break-inside:avoid}.pl thead{display:table-header-group}
     @page{size:A4 landscape;margin:12mm;@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Arial;color:#555}}</style></head>
-  <body><div class="tools"><button onclick="opener&&opener.plDownload('${no}','xlsx')">Download XLSX</button><button onclick="opener&&opener.plDownload('${no}','csv')">CSV</button><button onclick="print()">Print / PDF</button></div>
+  <body><div class="tools"><button onclick="opener&&opener.plDownload('${no}','xlsx')">Download XLSX</button><button onclick="opener&&opener.plDownload('${no}','csv')">CSV</button><button onclick="pdfDownload()">PDF</button><button onclick="print()">Print</button></div>${pdfScript(`PackingList_${X.invNo}`, "landscape")}
   <div class="sheet pl" style="width:297mm;min-height:auto">
     <img src="${new URL("senso-logo.png", location.href).href}" alt="Senso">
     <pre>${pfEsc(X.seller).replace(/^SELLER :/, "<b>SELLER :</b>")}</pre>
@@ -1407,10 +1416,14 @@ const CUST = {};
 let ME = "C-1021";   // giriş yapan müşteri (auth.js atar)
 const cartItems = () => Object.entries(state.cart).filter(([, b]) => b > 0);
 
+// Müşteri bildirimi: sipariş sevke hazır olunca final proforma hazır (sipariş açılınca okundu sayılır)
+const custNotices = () => sortOrders(ORDERS.filter((o) => o.cust === ME && o.custNotice && !o.custNotice.seen));
+const noticeCards = () => custNotices().map((o) => `<div class="notice gold" style="margin-bottom:12px">${ic("file")}<span><b>Your final proforma invoice is ready — order ${o.no}.</b> Your order is ready to ship; please review the proforma and complete any remaining payment.</span><button class="btn sm" onclick="go('customer/order/${o.no}')">View</button></div>`).join("");
 CUST.dashboard = () => {
   const mine = ORDERS.filter((o) => o.cust === ME);
   const active = mine.find((o) => o.stage < 5);
   return `${head(`Welcome back, ${C(ME).name}`, "", `<button class="btn gold lg" onclick="go('customer/products')">${ic("plus")} CREATE NEW ORDER</button>`)}
+  ${noticeCards()}
   <div class="grid g4">${kpi(mine.filter((o) => o.stage < 5).length, "Active Orders", "In progress", "cart")}${kpi(mine.filter((o) => o.stage === 4).length, "Ready for Shipment", "Awaiting pickup", "truck")}${kpi("October", "Next Forecast", "Due in 5 days", "trend")}${kpi(12, "Orders", "Last 12 months", "box")}</div>
   ${active ? `<div class="card mt"><div class="card-h"><h3>Order ${active.no}</h3>${stagePill(active.stage, true)}</div>${stepper(active.stage, STAGES_EN)}
     <div class="between mt wrap"><span class="muted">${money(orderTotal(active), active.currency)} · Payment: ${payState(active)[0]}</span><button class="btn sm" onclick="go('customer/order/${active.no}')">View order ${ic("chevR")}</button></div></div>` : ""}
@@ -1488,14 +1501,16 @@ function placeOrder() {
 CUST.orders = () => `${head("My Orders", "", `<button class="btn gold" onclick="go('customer/products')">${ic("plus")} New Order</button>`)}<div class="card">${ordersTable(ORDERS.filter((o) => o.cust === ME), true)}</div>`;
 CUST.order = (no) => {
   const o = O(no), L = orderQty(o.items), ps = payState(o), t = orderTotal(o);
+  const fresh = state.freshNotice === no;
   return `${head(`Order ${no}`, `${o.date} · ${money(t, o.currency)}${o.po ? ` · ${o.po}` : ""}`, `<button class="btn" onclick="reorder('${no}')">${ic("copy")} Reorder</button>`, `<a href="#/customer/orders">My Orders</a> / ${no}`)}
+  ${fresh ? `<div class="notice gold" style="margin-bottom:14px">${ic("file")}<span><b>Your final proforma invoice is ready.</b> You can view and download it under Documents.</span></div>` : ""}
   <div class="card">${stepper(Math.min(o.stage, 5), STAGES_EN)}</div>
   ${o.note || o.po ? `<div class="card note-card mt"><div class="card-h"><h3>${ic("edit")} Your Note</h3>${o.po ? `<span class="pill plain">PO: ${o.po}</span>` : ""}</div>${o.note ? `<p class="notranslate">${o.note.replace(/</g, "&lt;")}</p>` : ""}</div>` : ""}
   <div class="grid g-side mt"><div class="card"><div class="card-h"><h3>Products</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Total</th></tr></thead><tbody>
     ${o.items.map(([sku, b, pr]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(sku, b, orderLevel(o), pr), o.currency)}</td></tr>`; }).join("")}
     </tbody></table></div></div>
   <div><div class="card"><div class="card-h"><h3>Summary</h3></div><div class="stat-row"><span>Boxes / pcs</span><b>${num(L.boxes)} / ${num(L.pcs)}</b></div><div class="stat-row"><span>Payment</span><b><span class="pill ${ps[1]}">${ps[0]}</span></b></div><div class="stat-row"><span>Paid / Balance</span><b>${money(o.paid, o.currency)} / ${money(Math.max(0, t - o.paid), o.currency)}</b></div><div class="stat-row"><span>Incoterm</span><b>EXW Düzce</b></div></div>
-  <div class="card mt"><div class="card-h"><h3>Documents</h3></div>${[["pi", "Proforma Invoice", true], ["pl", "Packing List", true], ["ci", "Commercial Invoice", o.stage >= 5]].map(([k, d, ok]) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${d}</span>${ok ? `<span class="row" style="gap:6px"><button class="btn sm" onclick="openDoc('${o.no}','${k}')">View</button>${k === "pl" ? `<button class="btn sm" onclick="plDownload('${o.no}','xlsx')">XLSX</button><button class="btn sm" onclick="plDownload('${o.no}','csv')">CSV</button>` : ""}</span>` : `<small class="dim">not yet</small>`}</div>`).join("")}</div></div></div>`;
+  <div class="card mt"><div class="card-h"><h3>Documents</h3></div>${[["pi", "Final Proforma Invoice", o.stage >= 4], ["pl", "Packing List", o.stage >= 4], ["ci", "Commercial Invoice", o.stage >= 5]].map(([k, d, ok]) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${d}</span>${ok ? `<span class="row" style="gap:6px"><button class="btn sm" onclick="openDoc('${o.no}','${k}')">View</button>${k === "pl" ? `<button class="btn sm" onclick="plDownload('${o.no}','xlsx')">XLSX</button><button class="btn sm" onclick="plDownload('${o.no}','csv')">CSV</button>` : ""}</span>` : `<small class="dim">${k === "ci" ? "after shipment" : "when ready to ship"}</small>`}</div>`).join("")}</div></div></div>`;
 };
 function reorder(no) {
   const o = O(no);
@@ -1554,8 +1569,9 @@ function saveAccount() {
 // Hazırlık tamamlandı → Sevke Hazır (fabrika ekranı yok; admin sipariş detayından işaretlenir)
 function finishPrep(no) {
   const o = O(no); o.stage = 4; o.problem = false; o.shipped = Object.fromEntries(o.items);
-  log(no, "Hazırlık tamamlandı · sevke hazır");
-  toast("Hazırlık tamamlandı · sipariş sevke hazır"); rerender();
+  o.custNotice = { type: "pi", at: fmtDate(new Date()), seen: false };
+  log(no, "Hazırlık tamamlandı · sevke hazır · müşteriye final proforma bildirimi gönderildi");
+  toast("Sevke hazır · müşteri final proformayı görebilir, bildirim gönderildi"); rerender();
 }
 function reportProblem(no) {
   const o = O(no);
