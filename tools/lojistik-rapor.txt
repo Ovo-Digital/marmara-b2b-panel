@@ -5,3 +5,5 @@ Listede bulunamayan ürünler (0):
 
 Koli içi adet farkı (0) — katalogdaki (fiyat Excel'i) değer korundu:
 
+
+Not: Neck Strip (beyaz/siyah/kırmızı) listede 15 kg yazıyordu; birim değil koli ağırlığı kabul edildi → birim 0,75 kg (15 / 20). Firmaya teyit ettirilmeli.

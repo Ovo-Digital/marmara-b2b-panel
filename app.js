@@ -939,26 +939,51 @@ function plHtml(no) {
     </tbody></table>
   </div></body></html>`;
 }
+// Packing list indirme — XLSX: ekrandaki / PDF'teki görünümle aynı (logo, kalın etiketler, gri başlık, kenarlıklar);
+// CSV: Türkçe Excel'de doğru sütunlara açılsın diye noktalı virgül ayraç + virgüllü ondalık
+const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+let exceljsP = null;
+const loadExcelJS = () => (exceljsP ||= new Promise((ok, no) => { if (window.ExcelJS) return ok(); const sc = document.createElement("script"); sc.src = EXCELJS_URL; sc.onload = ok; sc.onerror = () => { exceljsP = null; no(new Error("Excel aracı yüklenemedi")); }; document.head.appendChild(sc); }));
+// Logo (beyaz PNG) → siyah PNG (Excel'de beyaz zemin üstünde görünsün)
+const blackLogo = () => new Promise((ok) => { const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = im.width; c.height = im.height; const x = c.getContext("2d"); x.filter = "invert(1)"; x.drawImage(im, 0, 0); ok({ data: c.toDataURL("image/png"), w: im.width, h: im.height }); }; im.onerror = () => ok(null); im.src = "senso-logo.png"; });
+const saveBlob = (blob, name) => { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
 async function plDownload(no, fmt) {
   const X = plData(no), file = `PackingList_${X.invNo}`.replace(/[^\w.-]+/g, "_");
-  const top = [Array(8).fill(""), [X.seller, "", "", "", "", "", "", ""], [X.buyer, "", "", "", "", "", "", ""], ["", "", "", "", "", "", `INVOICE NO: ${X.invNo}\nINVOICE DATE:  ${X.invDate}`, ""], X.head];
-  const totRow = ["", "", `Total m3 ${X.tot.m3}`, `Total ${X.pallets ?? "?"} Pallets`, X.tot.boxes, X.tot.qty, X.tot.net, ""];
+  const dec = (v) => (typeof v === "number" ? String(v).replace(".", ",") : v);
   if (fmt === "csv") {
-    const q = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-    const body = X.rows.map((r) => r.map((v, i) => (i === 2 && v ? "'" + v : v)));
-    const csv = "﻿" + [...top, ...body, Array(8).fill(""), totRow].map((r) => r.map(q).join(",")).join("\r\n");
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = file + ".csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    const q = (v) => { const t = String(v ?? ""); return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const rows = [[""], [X.seller], [X.buyer], ["", "", "", "", "", "", `INVOICE NO: ${X.invNo}\nINVOICE DATE:  ${X.invDate}`], X.head,
+      ...X.rows.map((r) => r.map((v, i) => (i === 2 && v ? "'" + v : dec(v)))), [""],
+      ["", "", `Total m3 ${dec(X.tot.m3)}`, `Total ${X.pallets ?? "?"} Pallets`, X.tot.boxes, X.tot.qty, dec(X.tot.net), ""]];
+    saveBlob(new Blob(["﻿" + rows.map((r) => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }), file + ".csv");
     return toast("Packing list CSV indirildi", "download");
   }
-  try { await loadXlsx(); } catch (e) { return toast(e.message, "alert"); }
-  const aoa = [...top, ...X.rows.map((r) => r.map((v, i) => (i === 2 ? String(v) : v))), Array(8).fill(""), totRow];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } }, { s: { r: 3, c: 6 }, e: { r: 3, c: 7 } }];
-  ws["!cols"] = [{ wch: 11 }, { wch: 15 }, { wch: 16 }, { wch: 44 }, { wch: 7 }, { wch: 10 }, { wch: 9 }, { wch: 15 }];
-  ws["!rows"] = [{ hpt: 12 }, { hpt: 80 }, { hpt: 66 }, { hpt: 32 }];
-  X.rows.forEach((r, i) => { const ref = XLSX.utils.encode_cell({ r: 5 + i, c: 2 }); if (ws[ref]) { ws[ref].t = "s"; ws[ref].z = "@"; } });
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Packing List");
-  XLSX.writeFile(wb, file + ".xlsx");
+  try { await loadExcelJS(); } catch (e) { return toast(e.message, "alert"); }
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet("Packing List", { pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } } });
+  ws.columns = [11, 16, 17, 46, 8, 11, 11, 17].map((width) => ({ width }));
+  const F = "Arial", thin = { style: "thin", color: { argb: "FF444444" } }, box = { top: thin, left: thin, bottom: thin, right: thin }, gray = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB7B7B7" } };
+  const logo = await blackLogo();
+  if (logo) { const id = wb.addImage({ base64: logo.data, extension: "png" }); ws.addImage(id, { tl: { col: 0.3, row: 0.2 }, ext: { width: 110, height: Math.round((110 * logo.h) / logo.w) } }); }
+  for (let r = 1; r <= 6; r++) ws.getRow(r).height = 18;
+  const block = (r, label, text, h) => { ws.mergeCells(r, 1, r, 5); const c = ws.getCell(r, 1); const [first, ...rest] = text.split("\n");
+    c.value = { richText: [{ text: label, font: { name: F, bold: true, size: 10 } }, { text: first.slice(label.length) + (rest.length ? "\n" + rest.join("\n") : ""), font: { name: F, size: 10 } }] };
+    c.alignment = { wrapText: true, vertical: "top" }; ws.getRow(r).height = h; };
+  block(7, "SELLER :", X.seller, 74);
+  block(9, "BUYER :", X.buyer, 62);
+  ws.mergeCells(11, 6, 11, 8); const inv = ws.getCell(11, 6);
+  inv.value = { richText: [{ text: "INVOICE NO: ", font: { name: F, bold: true, size: 10 } }, { text: X.invNo + "\n", font: { name: F, size: 10 } }, { text: "INVOICE DATE: ", font: { name: F, bold: true, size: 10 } }, { text: X.invDate, font: { name: F, size: 10 } }] };
+  inv.alignment = { horizontal: "right", vertical: "top", wrapText: true }; ws.getRow(11).height = 30;
+  const hr = ws.getRow(13); hr.values = X.head; hr.height = 20;
+  hr.eachCell((c) => { c.font = { name: F, bold: true, size: 10 }; c.fill = gray; c.border = box; c.alignment = { horizontal: "center", vertical: "middle" }; });
+  X.rows.forEach((r, i) => {
+    const row = ws.getRow(14 + i); row.values = r.map((v, k) => (k === 2 ? String(v || "") : v));
+    row.eachCell({ includeEmpty: true }, (c, k) => { if (k > 8) return; c.font = { name: F, size: 10 }; c.border = box; c.alignment = { horizontal: k === 4 ? "left" : "center", vertical: "middle" }; if (k === 3) c.numFmt = "@"; if (k === 7) c.numFmt = "0.##"; });
+  });
+  const tr = ws.getRow(14 + X.rows.length + 1);
+  tr.values = ["", "", `Total m3 ${dec(X.tot.m3)}`, `Total ${X.pallets ?? "?"} Pallets`, X.tot.boxes, X.tot.qty, X.tot.net, ""]; tr.height = 20;
+  for (let k = 3; k <= 7; k++) { const c = tr.getCell(k); c.font = { name: F, bold: true, size: 10 }; c.fill = gray; c.border = box; c.alignment = { horizontal: "center", vertical: "middle" }; if (k === 7) c.numFmt = "0.##"; }
+  ws.views = [{ showGridLines: false }];
+  saveBlob(new Blob([await wb.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), file + ".xlsx");
   toast("Packing list XLSX indirildi", "download");
 }
 // Belgeler panel içinde tam ekran açılır (WhatsApp / Instagram içi tarayıcılar ve açılır pencere engelleyiciler yeni pencereyi engelliyor)
