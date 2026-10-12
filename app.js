@@ -1503,6 +1503,9 @@ function productCard(p) {
       <div class="qty"><button onclick="setQty('${p.sku}',${b - 1})">−</button><input value="${b}" inputmode="numeric" onchange="setQty('${p.sku}',this.value)"><span class="u">BOXES</span><button onclick="setQty('${p.sku}',${b + 1})">+</button></div>
     </div></div>`;
 }
+function clearCart() {
+  modal(`<h2>Clear cart</h2><p class="muted">All products will be removed from your current order.</p><div class="m-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn danger" onclick="state.cart={};closeModal();toast('Cart cleared','trash');rerender()">${ic("trash")} Clear cart</button></div>`);
+}
 function setQty(sku, v) {
   const p = P(sku);
   const n = Math.max(0, parseInt(v) || 0);
@@ -1515,7 +1518,7 @@ function setQty(sku, v) {
 function cartPanel() {
   const items = cartItems(), Q = orderQty(items);
   const total = items.reduce((s, [sku, b]) => s + lineTotal(sku, b), 0);
-  return `<div class="card cartp"><div class="card-h"><h3>Current Order</h3><span class="sub">${items.length} SKUs</span></div>
+  return `<div class="card cartp"><div class="card-h"><h3>Current Order</h3><span class="row" style="gap:10px"><span class="sub">${items.length} SKUs</span>${items.length ? `<button class="btn sm ghost" onclick="clearCart()">${ic("trash")} Clear cart</button>` : ""}</span></div>
     <div class="total">${money(total, levelCur(levelOf(ME)), 2)}</div>
     <div class="mt"><div class="stat-row"><span>Boxes</span><b>${num(Q.boxes)}</b></div><div class="stat-row"><span>Pieces</span><b>${num(Q.pcs)}</b></div></div>
     ${items.length ? "" : `<div class="notice info mt">${ic("info")}<span>Add boxes to start your order.</span></div>`}

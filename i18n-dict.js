@@ -1,5 +1,8 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Clear cart": {"tr":"Sepeti boşalt","en":"Clear cart","es":"Vaciar carrito","de":"Warenkorb leeren","ru":"Очистить корзину"},
+  "All products will be removed from your current order.": {"tr":"Mevcut siparişteki tüm ürünler kaldırılacak.","en":"All products will be removed from your current order.","es":"Se eliminarán todos los productos del pedido actual.","de":"Alle Produkte werden aus der aktuellen Bestellung entfernt.","ru":"Все товары будут удалены из текущего заказа."},
+  "Cart cleared": {"tr":"Sepet boşaltıldı","en":"Cart cleared","es":"Carrito vaciado","de":"Warenkorb geleert","ru":"Корзина очищена"},
   "Billing Address": {"tr":"Fatura Adresi","en":"Billing Address","es":"Dirección de facturación","de":"Rechnungsadresse","ru":"Адрес для счёта"},
   "Billing address": {"tr":"Fatura adresi","en":"Billing address","es":"Dirección de facturación","de":"Rechnungsadresse","ru":"Адрес для счёта"},
   "Billing address *": {"tr":"Fatura adresi *","en":"Billing address *","es":"Dirección de facturación *","de":"Rechnungsadresse *","ru":"Адрес для счёта *"},
