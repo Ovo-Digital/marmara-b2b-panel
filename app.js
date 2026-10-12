@@ -75,7 +75,10 @@ const orderPrice = (o, p) => priceAt(p, orderLevel(o));
 const custPrice = (p) => priceAt(p, levelOf(ME));
 const syncOrder = (o) => { o.currency = levelCur(orderLevel(o)); };
 const lineTotal = (sku, boxes, lvl = levelOf(ME), price) => { const p = P(sku); return boxes * p.pcsBox * (price ?? priceAt(p, lvl)); };
-const orderTotal = (o) => o.items.reduce((s, [sku, b, pr]) => s + lineTotal(sku, b, orderLevel(o), pr), 0);
+const itemsTotal = (o) => o.items.reduce((s, [sku, b, pr]) => s + lineTotal(sku, b, orderLevel(o), pr), 0);
+// Sipariş bazında ek bedel (+) / indirim (−) satırları, açıklamalı: [{ label, amount }]
+const adjTotal = (o) => (o.adjust || []).reduce((s, a) => s + (+a.amount || 0), 0);
+const orderTotal = (o) => itemsTotal(o) + adjTotal(o);
 const orderBoxes = (items) => items.reduce((s, [, b]) => s + b, 0);
 const targetLabel = (t) => (t === "pallet" ? "Palet" : SETTINGS.containers[t]?.label || "—");
 // Sipariş miktarı: koli / adet / brüt kg (palet & konteyner hesabı kaldırıldı)
@@ -720,9 +723,14 @@ ADMIN.order = (no) => {
           <td class="r muted">${num(b * p.pcsBox)}</td>
           <td class="r">${editable ? `<div class="price-in"><span>${sym(o.currency)}</span><input class="input num-in" type="number" min="0" step="0.01" value="${up.toFixed(2)}" onchange="revisePrice('${no}',${i},this.value)"></div>` : `<span class="muted">${money(up, o.currency, 2)}</span>`}${pr != null ? `<br><small class="gold-t">${money(orderPrice(o, p), o.currency, 2)} liste</small>` : ""}</td>
           <td class="r strong">${money(lineTotal(sku, b, orderLevel(o), pr), o.currency)}</td></tr>`; }).join("")}
-        <tr><td colspan="4" class="r muted">Toplam · ${num(L.boxes)} koli · ${num(L.pcs)} adet</td><td class="r strong" style="font:600 18px var(--display)">${money(total, o.currency)}</td></tr>
+        ${(o.adjust || []).length ? `<tr><td colspan="4" class="r muted">Ara toplam · ${num(L.boxes)} koli · ${num(L.pcs)} adet</td><td class="r">${money(itemsTotal(o), o.currency, 2)}</td></tr>${o.adjust.map((a) => `<tr><td colspan="4" class="r">${pfEsc(a.label)}</td><td class="r ${a.amount < 0 ? "ok-t" : ""}">${a.amount < 0 ? "−" : "+"}${money(Math.abs(a.amount), o.currency, 2)}</td></tr>`).join("")}` : ""}
+        <tr><td colspan="4" class="r muted">${(o.adjust || []).length ? "Genel toplam" : `Toplam · ${num(L.boxes)} koli · ${num(L.pcs)} adet`}</td><td class="r strong" style="font:600 18px var(--display)">${money(total, o.currency)}</td></tr>
         </tbody></table></div></div>
 
+      <div class="card mt"><div class="card-h"><h3>Ek Bedel / İndirim</h3><span class="sub">Proforma ve faturada özet bölümünde açıklamasıyla görünür</span></div>
+        ${(o.adjust || []).length ? (o.adjust || []).map((a, i) => `<div class="stat-row"><span style="color:var(--text)">${a.amount < 0 ? '<span class="pill ok plain">İndirim</span>' : '<span class="pill warn plain">Ek bedel</span>'} ${pfEsc(a.label)}</span><span class="row" style="gap:10px"><b>${a.amount < 0 ? "−" : "+"}${money(Math.abs(a.amount), o.currency, 2)}</b>${editable ? `<button class="btn sm ghost" title="Kaldır" onclick="removeAdj('${no}',${i})">${ic("x")}</button>` : ""}</span></div>`).join("") : '<p class="muted" style="margin:0 0 6px">Eklenmiş ek bedel veya indirim yok.</p>'}
+        ${editable ? `<div class="adj-form mt"><select class="input" id="adjType"><option value="1">Ek bedel (+)</option><option value="-1">İndirim (−)</option></select><input class="input" id="adjLabel" placeholder="Açıklama — ör. İç nakliye bedeli"><input class="input" id="adjAmt" type="number" min="0" step="0.01" placeholder="Tutar (${o.currency})"><button class="btn gold" onclick="addAdj('${no}')">${ic("plus")} Ekle</button></div>` : ""}
+      </div>
       <div class="card mt"><div class="card-h"><h3>Aktivite Log</h3></div><ul class="tl">${logs.slice().reverse().map(([d, m]) => `<li>${m}<small>${d}</small></li>`).join("")}</ul></div>
     </div>
     <div>
@@ -732,6 +740,18 @@ ADMIN.order = (no) => {
     </div>
   </div>`;
 };
+function addAdj(no) {
+  const o = O(no), sign = +$("#adjType").value, label = $("#adjLabel").value.trim(), amt = Math.round((parseFloat(String($("#adjAmt").value).replace(",", ".")) || 0) * 100) / 100;
+  if (!label) return toast("Açıklama girin (ne için olduğu proformada yazacak)", "alert");
+  if (amt <= 0) return toast("Geçerli bir tutar girin", "alert");
+  (o.adjust ||= []).push({ label, amount: sign * amt });
+  log(no, `${sign > 0 ? "Ek bedel" : "İndirim"} eklendi: ${label} ${sign > 0 ? "+" : "−"}${money(amt, o.currency, 2)}${o.stage >= 2 ? " · proforma yeni revizyon" : ""}`);
+  toast(`${sign > 0 ? "Ek bedel" : "İndirim"} eklendi · yeni toplam ${money(orderTotal(o), o.currency, 2)}`); rerender();
+}
+function removeAdj(no, i) {
+  const o = O(no), a = o.adjust[i]; o.adjust.splice(i, 1);
+  log(no, `${a.amount < 0 ? "İndirim" : "Ek bedel"} kaldırıldı: ${a.label}`); toast("Kaldırıldı · yeni toplam " + money(orderTotal(o), o.currency, 2)); rerender();
+}
 function advance(no, dir = 1) {
   const o = O(no);
   o.stage = Math.max(0, Math.min(5, o.stage + dir));
@@ -822,8 +842,8 @@ function docHtml(no, type) {
   <div class="closing">
     <div class="tq"><b>TOTAL CARTONS: ${num(D.sum("q"))}</b><b>TOTAL QUANTITY: ${num(D.sum("pcs"))} PCS</b></div>
     <h4 class="bar">ORDER SUMMARY</h4>
-    <div class="sum"><div><span>Subtotal</span><span>${n2(D.subtotal)}</span></div><div><span>Additional Charges</span><span>${n2(o.charges || 0)}</span></div><div><span>Tax</span><span>${n2(0)}</span></div>
-      <div class="gt"><span>GRAND TOTAL (${cur})</span><span>${n2(D.subtotal + (o.charges || 0))}</span></div></div>
+    <div class="sum"><div><span>Subtotal</span><span>${n2(D.subtotal)}</span></div>${(o.adjust || []).length ? o.adjust.map((a) => `<div><span>${a.amount < 0 ? "Discount" : "Additional Charge"}: ${pfEsc(a.label)}</span><span>${a.amount < 0 ? "-" : ""}${n2(Math.abs(a.amount))}</span></div>`).join("") : `<div><span>Additional Charges</span><span>${n2(0)}</span></div>`}<div><span>Tax</span><span>${n2(0)}</span></div>
+      <div class="gt"><span>GRAND TOTAL (${cur})</span><span>${n2(D.subtotal + adjTotal(o))}</span></div></div>
     <h4 class="bar">BANK DETAILS</h4>
     <div class="bank"><div><span>Beneficiary: ${COMPANY.legal}</span><span>IBAN: ${phx(bank.iban)}</span><span>Account Currency: ${cur}</span></div><div><span>Bank: ${phx(bank.bank)}</span><span>SWIFT / BIC: ${phx(bank.swift)}</span></div></div>
     <h4 class="bar">PAYMENT, DELIVERY &amp; NOTES</h4>
@@ -1509,7 +1529,7 @@ CUST.order = (no) => {
   <div class="grid g-side mt"><div class="card"><div class="card-h"><h3>Products</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Total</th></tr></thead><tbody>
     ${o.items.map(([sku, b, pr]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r strong">${money(lineTotal(sku, b, orderLevel(o), pr), o.currency)}</td></tr>`; }).join("")}
     </tbody></table></div></div>
-  <div><div class="card"><div class="card-h"><h3>Summary</h3></div><div class="stat-row"><span>Boxes / pcs</span><b>${num(L.boxes)} / ${num(L.pcs)}</b></div><div class="stat-row"><span>Payment</span><b><span class="pill ${ps[1]}">${ps[0]}</span></b></div><div class="stat-row"><span>Paid / Balance</span><b>${money(o.paid, o.currency)} / ${money(Math.max(0, t - o.paid), o.currency)}</b></div><div class="stat-row"><span>Incoterm</span><b>EXW Düzce</b></div></div>
+  <div><div class="card"><div class="card-h"><h3>Summary</h3></div><div class="stat-row"><span>Boxes / pcs</span><b>${num(L.boxes)} / ${num(L.pcs)}</b></div>${(o.adjust || []).map((a) => `<div class="stat-row"><span>${a.amount < 0 ? "Discount" : "Additional charge"}: <span class="notranslate">${pfEsc(a.label)}</span></span><b>${a.amount < 0 ? "−" : "+"}${money(Math.abs(a.amount), o.currency, 2)}</b></div>`).join("")}<div class="stat-row"><span>Payment</span><b><span class="pill ${ps[1]}">${ps[0]}</span></b></div><div class="stat-row"><span>Paid / Balance</span><b>${money(o.paid, o.currency)} / ${money(Math.max(0, t - o.paid), o.currency)}</b></div><div class="stat-row"><span>Incoterm</span><b>EXW Düzce</b></div></div>
   <div class="card mt"><div class="card-h"><h3>Documents</h3></div>${[["pi", "Final Proforma Invoice", o.stage >= 4], ["pl", "Packing List", o.stage >= 4], ["ci", "Commercial Invoice", o.stage >= 5]].map(([k, d, ok]) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${d}</span>${ok ? `<span class="row" style="gap:6px"><button class="btn sm" onclick="openDoc('${o.no}','${k}')">View</button>${k === "pl" ? `<button class="btn sm" onclick="plDownload('${o.no}','xlsx')">XLSX</button><button class="btn sm" onclick="plDownload('${o.no}','csv')">CSV</button>` : ""}</span>` : `<small class="dim">${k === "ci" ? "after shipment" : "when ready to ship"}</small>`}</div>`).join("")}</div></div></div>`;
 };
 function reorder(no) {

@@ -1,5 +1,8 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Discount": {"tr":"İndirim","en":"Discount","es":"Descuento","de":"Rabatt","ru":"Скидка"},
+  "Additional charge": {"tr":"Ek bedel","en":"Additional charge","es":"Cargo adicional","de":"Zusatzkosten","ru":"Доп. расход"},
+  "Ek Bedel / İndirim": {"tr":"Ek Bedel / İndirim","en":"Extra Charge / Discount","es":"Cargo extra / Descuento","de":"Zuschlag / Rabatt","ru":"Доплата / Скидка"},
   "Final Proforma Invoice": {"tr":"Final Proforma Fatura","en":"Final Proforma Invoice","es":"Factura proforma final","de":"Finale Proforma-Rechnung","ru":"Окончательный проформа-счёт"},
   "when ready to ship": {"tr":"sevke hazır olunca","en":"when ready to ship","es":"cuando esté listo para enviar","de":"bei Versandbereitschaft","ru":"когда будет готов к отправке"},
   "after shipment": {"tr":"sevkiyattan sonra","en":"after shipment","es":"tras el envío","de":"nach Versand","ru":"после отправки"},

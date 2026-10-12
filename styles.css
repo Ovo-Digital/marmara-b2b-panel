@@ -516,3 +516,7 @@ body.auth-on .app, body.auth-on .rv-fab, body.auth-on .rv-banner { display: none
 @media (max-width: 760px) { .form.cols4 { grid-template-columns: 1fr 1fr; } }
 .base-box summary { cursor: pointer; list-style: none; }
 .base-box summary::-webkit-details-marker { display: none; }
+
+/* sipariş: ek bedel / indirim formu */
+.adj-form { display: grid; grid-template-columns: 150px 1fr 150px auto; gap: 8px; }
+@media (max-width: 760px) { .adj-form { grid-template-columns: 1fr 1fr; } }
