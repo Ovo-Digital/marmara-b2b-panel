@@ -100,6 +100,7 @@ function authRender() {
         ${f("Company name", "rgName", "text", 1)}${s("Country", "rgCountry", ["Germany", "France", "Sweden", "USA", "UAE", "Saudi Arabia", "Lithuania", "Romania"])}
         ${f("City", "rgCity")}${f("Tax / VAT number", "rgVat", "text", 1)}
         <div class="field span2"><label>Billing address *</label><textarea class="input" id="rgAddr" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div>
+        <div class="field span2"><label>Delivery address *</label><label class="checks" style="margin:0 0 6px"><label><input type="checkbox" id="rgSame" onchange="$('#rgShip').disabled=this.checked;if(this.checked)$('#rgShip').value=$('#rgAddr').value"> Same as billing address</label></label><textarea class="input" id="rgShip" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div>
         ${s("Company type", "rgType", ["Distributor", "Wholesaler", "Barber Chain", "Retail Chain"])}<div class="field"><label>Instagram</label><input class="input" id="rgIg" placeholder="@hesabiniz"></div>
         <div class="field span2"><label>Web siteniz var mı?</label><div class="seg" style="max-width:260px"><button type="button" id="rgWebY" onclick="authWeb(true)">Evet</button><button type="button" id="rgWebN" class="on" onclick="authWeb(false)">Hayır</button></div></div>
         <div class="field span2" id="rgWebBox" style="display:none"><label>Web sitesi adresi *</label><input class="input" id="rgWeb" type="url" placeholder="https://www.ornek.com"></div>
@@ -138,7 +139,8 @@ function authWeb(yes) {
 async function authRegister() {
   const v = (id) => $("#" + id).value.trim();
   const err = (m) => { $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
-  if (!v("rgName") || !v("rgAddr") || !v("rgVat") || !v("rgContact") || !v("rgEmail") || !v("rgPw")) return err("Please fill all required fields");
+  const ship = $("#rgSame").checked ? v("rgAddr") : v("rgShip");
+  if (!v("rgName") || !v("rgAddr") || !ship || !v("rgVat") || !v("rgContact") || !v("rgEmail") || !v("rgPw")) return err("Please fill all required fields");
   if (v("rgPw") !== v("rgPw2")) return err("Passwords do not match");
   if (!$("#cKvkk").checked || !$("#cTerms").checked) return err("Devam etmek için Aydınlatma Metni ve Kullanım Koşulları onayı gerekli");
   const hasWeb = $("#rgWebY").classList.contains("on");
@@ -148,7 +150,7 @@ async function authRegister() {
   if (authRegs().some((r) => r.u === email) || ACCOUNTS.some((a) => a.u === email)) return err("Bu e-posta ile zaten bir başvuru var");
   const country = v("rgCountry");
   const flags = { Germany: "🇩🇪", France: "🇫🇷", Sweden: "🇸🇪", USA: "🇺🇸", UAE: "🇦🇪", "Saudi Arabia": "🇸🇦", Lithuania: "🇱🇹", Romania: "🇷🇴" };
-  const cust = { id: "A-" + Date.now().toString(36).toUpperCase(), name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", address: v("rgAddr"), type: v("rgType"), sales: "", level: 1, currency: "USD", payment: "", incoterm: "", status: "Pending", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
+  const cust = { id: "A-" + Date.now().toString(36).toUpperCase(), name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", address: v("rgAddr"), shipAddress: ship, type: v("rgType"), sales: "", level: 1, currency: "USD", payment: "", incoterm: "", status: "Pending", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
     contact: v("rgContact"), email, vat: v("rgVat"), brands: [...document.querySelectorAll(".rgBrand:checked")].map((b) => b.value).join(" / "), applied: fmtDate(new Date()), phone: v("rgPhone") || "—", position: v("rgPos") || "—", website: hasWeb ? v("rgWeb") : "Yok", instagram: v("rgIg").replace(/^@?/, v("rgIg") ? "@" : "") || "—",
     consents: { version: LEGAL_VERSION, kvkk: new Date().toISOString(), terms: new Date().toISOString(), marketing: $("#cMkt").checked ? new Date().toISOString() : null } };
   CUSTOMERS.push(cust);

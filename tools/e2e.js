@@ -17,7 +17,7 @@
     if (step === 1) {                       // MÜŞTERİ cihazı — üye ol
       authLogout(); await tick(); authView = "register"; authRender(); await tick();
       const set = (id, v) => ($("#" + id).value = v);
-      set("rgName", CO_NAME); set("rgVat", "DE999888777"); set("rgCity", "Hamburg"); set("rgAddr", "Lagerweg 1, 20095 Hamburg"); set("rgContact", "Erika Test"); set("rgEmail", EMAIL); set("rgPhone", "+49 40 1234");
+      set("rgName", CO_NAME); set("rgVat", "DE999888777"); set("rgCity", "Hamburg"); set("rgAddr", "Rechnungsweg 5, 20095 Hamburg"); set("rgShip", "Lagerweg 1, 20095 Hamburg"); set("rgContact", "Erika Test"); set("rgEmail", EMAIL); set("rgPhone", "+49 40 1234");
       set("rgIg", "e2ebarber"); authWeb(true); set("rgWeb", "https://e2e-barber.de"); set("rgPw", PW); set("rgPw2", PW);
       await authRegister(); ok(/onay/i.test($("#auErr")?.textContent || "") && !CUSTOMERS.some((c) => c.email === EMAIL), "onay kutuları işaretlenmeden gönderim engellendi: " + ($("#auErr")?.textContent || "—"));
       $("#cKvkk").checked = true; $("#cTerms").checked = true; await authRegister(); await settle();

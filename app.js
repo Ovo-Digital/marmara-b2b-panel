@@ -84,7 +84,8 @@ const orderBoxes = (items) => items.reduce((s, [, b]) => s + b, 0);
 const targetLabel = (t) => (t === "pallet" ? "Palet" : SETTINGS.containers[t]?.label || "—");
 // Sipariş miktarı: koli / adet / brüt kg (palet & konteyner hesabı kaldırıldı)
 const orderQty = (items) => items.reduce((a, [sku, b]) => { const p = P(sku); a.boxes += b; a.pcs += b * p.pcsBox; a.kg += b * p.kg; return a; }, { boxes: 0, pcs: 0, kg: 0 });
-const custAddress = (c) => c.address || [c.city, c.country].filter((x) => x && x !== "—").join(", ");
+const custAddress = (c) => c.address || [c.city, c.country].filter((x) => x && x !== "—").join(", ");   // fatura adresi
+const custShip = (c) => c.shipAddress || custAddress(c);                                                       // teslimat adresi
 const imgSrc = (x) => (!x ? "" : x.includes("/") ? x : "img/" + x);
 const noImg = (p) => `<span class="no-img">${(p.brand || "?").split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>`;
 const thumb = (p) => `<div class="thumb">${p.img ? `<img src="${imgSrc(p.img)}" alt="" loading="lazy">` : noImg(p)}</div>`;
@@ -549,7 +550,7 @@ const custInfoDl = (c) => {
   const v = (x) => (x && x !== "—" ? pfEsc(x) : '<span class="dim">—</span>');
   const link = (u) => (u && u !== "—" ? `<a href="${/^https?:/.test(u) ? pfEsc(u) : "https://" + pfEsc(u)}" target="_blank" rel="noopener">${pfEsc(u)}</a>` : v(u));
   const ig = (x) => (x && x !== "—" ? `<a href="https://instagram.com/${pfEsc(x.replace(/^@/, ""))}" target="_blank" rel="noopener">${pfEsc(x)}</a>` : v(x));
-  const rows = [["Firma", v(c.name)], ["Firma tipi", v(c.type)], ["Ülke / Şehir", `${c.flag || ""} ${v(c.country)} · ${v(c.city)}`], ["Fatura adresi", v(c.address)], ["VAT / Vergi no", `<span class="mono">${v(c.vat)}</span>`],
+  const rows = [["Firma", v(c.name)], ["Firma tipi", v(c.type)], ["Ülke / Şehir", `${c.flag || ""} ${v(c.country)} · ${v(c.city)}`], ["Fatura adresi", v(c.address)], ["Teslimat adresi", v(c.shipAddress || c.address)], ["VAT / Vergi no", `<span class="mono">${v(c.vat)}</span>`],
     ["Yetkili kişi", v(c.contact)], ["Pozisyon", v(c.position)], ["E-posta", c.email ? `<a href="mailto:${pfEsc(c.email)}">${pfEsc(c.email)}</a>` : v("")], ["Telefon / WhatsApp", v(c.phone)],
     ["Web sitesi", link(c.website)], ["Instagram", ig(c.instagram)], ["İlgilendiği markalar", v(c.brands)], ["Başvuru tarihi", v(c.applied)],
     ["Yasal onaylar", c.consents ? `KVKK ✓ · Koşullar ✓ · Pazarlama ${c.consents.marketing ? "✓" : "✗"} <small class="muted">(v${c.consents.version})</small>` : v("")], ["Son güncelleme", v(c.updated)]];
@@ -749,7 +750,7 @@ ADMIN.order = (no) => {
     <div>
       <div class="card">${action}</div>
       <div class="card mt"><div class="card-h"><h3>Ticari Şartlar</h3></div>
-        <div class="stat-row"><span>Teslim</span><b>${c.incoterm}</b></div><div class="stat-row"><span>Ödeme</span><b>${c.payment}</b></div><div class="stat-row"><span>Fiyat seviyesi</span><select class="input" style="height:32px;width:auto;max-width:210px" ${o.stage >= 5 ? "disabled" : ""} onchange="setOrderLevel('${o.no}',this.value)">${LEVELS.map((l) => `<option value="${l.id}" ${l.id === orderLevel(o) ? "selected" : ""}>${l.name}</option>`).join("")}</select></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Banka</span><b>${o.currency} Bank A</b></div><div class="stat-row"><span>Fatura adresi</span><b class="notranslate" style="text-align:right;max-width:230px">${pfEsc(o.billAddress || custAddress(c))}</b></div><div class="stat-row"><span>Teslimat adresi</span><b class="notranslate" style="text-align:right;max-width:230px">${pfEsc(o.address || o.billAddress || custAddress(c))}</b></div></div>
+        <div class="stat-row"><span>Teslim</span><b>${c.incoterm}</b></div><div class="stat-row"><span>Ödeme</span><b>${c.payment}</b></div><div class="stat-row"><span>Fiyat seviyesi</span><select class="input" style="height:32px;width:auto;max-width:210px" ${o.stage >= 5 ? "disabled" : ""} onchange="setOrderLevel('${o.no}',this.value)">${LEVELS.map((l) => `<option value="${l.id}" ${l.id === orderLevel(o) ? "selected" : ""}>${l.name}</option>`).join("")}</select></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Banka</span><b>${o.currency} Bank A</b></div><div class="stat-row"><span>Fatura adresi</span><b class="notranslate" style="text-align:right;max-width:230px">${pfEsc(o.billAddress || custAddress(c))}</b></div><div class="stat-row"><span>Teslimat adresi</span><b class="notranslate" style="text-align:right;max-width:230px">${pfEsc(o.address || custShip(c))}</b></div></div>
     </div>
   </div>`;
 };
@@ -1538,9 +1539,8 @@ CUST.checkout = () => {
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Unit</th><th class="r">Total</th></tr></thead><tbody>
       ${items.map(([sku, b]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r muted">${money(custPrice(p), cur, 2)}</td><td class="r strong">${money(lineTotal(sku, b), cur, 2)}</td></tr>`; }).join("")}
       </tbody></table></div></div>
-    <div class="card mt"><div class="form"><div class="field"><label>Billing Address</label><textarea class="input notranslate" id="ckBill" rows="2">${pfEsc(custAddress(c))}</textarea><small class="muted">From your registration — edit if needed for this order.</small></div>
-      <label class="checks" style="margin:2px 0 4px"><label><input type="checkbox" id="ckShipDiff" onchange="$('#ckShipBox').style.display=this.checked?'':'none'"> Deliver to a different address</label></label>
-      <div class="field" id="ckShipBox" style="display:none"><label>Delivery Address</label><textarea class="input notranslate" id="ckAddr" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div><div class="field"><label>Order Notes</label><textarea class="input" id="ckNote" placeholder="Optional…"></textarea></div></div></div>
+    <div class="card mt"><div class="form"><div class="field"><label>Billing Address</label><textarea class="input notranslate" id="ckBill" rows="2">${pfEsc(custAddress(c))}</textarea></div>
+      <div class="field"><label>Delivery Address</label><textarea class="input notranslate" id="ckAddr" rows="2">${pfEsc(custShip(c))}</textarea><small class="muted">Both addresses come from your registration — edit if needed for this order.</small></div><div class="field"><label>Order Notes</label><textarea class="input" id="ckNote" placeholder="Optional…"></textarea></div></div></div>
   </div>
   <div><div class="card cartp"><div class="card-h"><h3>Order Summary</h3></div>
     <div class="stat-row"><span>Subtotal</span><b>${money(total, cur, 2)}</b></div><div class="stat-row"><span>Shipping term</span><b>EXW Düzce</b></div><div class="stat-row"><span>Payment term</span><b>100% Advance</b></div>
@@ -1553,7 +1553,7 @@ function placeOrder() {
   if (!cartItems().length || actAsMissing()) return;
   const seq = Math.max(148, ...ORDERS.map((o) => +o.no.slice(-4))) + 1, no = "PO-2026-" + String(seq).padStart(4, "0");
   const sess = authSession(), byAdmin = sess?.role === "admin";
-  ORDERS.unshift({ no, po: no, cust: ME, date: fmtDate(new Date()), currency: levelCur(levelOf(ME)), created: new Date().toISOString(), stage: 0, paid: 0, problem: false, items: cartItems().map(([s, b]) => [s, b]), note: $("#ckNote")?.value.trim() || "", billAddress: $("#ckBill")?.value.trim() || custAddress(C(ME)), address: ($("#ckShipDiff")?.checked && $("#ckAddr")?.value.trim()) || $("#ckBill")?.value.trim() || custAddress(C(ME)), by: byAdmin ? sess.name : "" });
+  ORDERS.unshift({ no, po: no, cust: ME, date: fmtDate(new Date()), currency: levelCur(levelOf(ME)), created: new Date().toISOString(), stage: 0, paid: 0, problem: false, items: cartItems().map(([s, b]) => [s, b]), note: $("#ckNote")?.value.trim() || "", billAddress: $("#ckBill")?.value.trim() || custAddress(C(ME)), address: $("#ckAddr")?.value.trim() || custShip(C(ME)), by: byAdmin ? sess.name : "" });
   state.logs[no] = [[new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", ""), byAdmin ? `${sess.name} siparişi ${C(ME).name} adına oluşturdu` : `${C(ME).name} siparişi portaldan oluşturdu`]];
   state.cart = {};
   if (byAdmin) { state.actAs = null; toast(`${no} oluşturuldu · ${C(ME).name}`); go("admin/order/" + no); }
@@ -1608,15 +1608,15 @@ CUST.forecast = () => `${head("Forecast", "", `<button class="btn" onclick="toas
 CUST.documents = () => `${head("Document Center", "", `<button class="btn gold" onclick="toast('All available documents are being zipped','download')">${ic("download")} Download All</button>`)}<div class="card">${docsTable(true, C(ME))}</div>`;
 CUST.marketing = () => `${head("Marketing Hub", "", `<button class="btn gold" onclick="toast('Brand kit downloading','download')">${ic("download")} Brand Kit</button>`)}${mkChips(true)}${assetGrid()}`;
 CUST.account = () => { const c = C(ME), v = (x) => (x && x !== "—" ? pfEsc(x) : '<span class="dim">—</span>'); return `${head("Account", c.name, `<button class="btn gold" onclick="editAccount()">${ic("edit")} Edit details</button>`)}
-  <div class="grid g2"><div class="card"><div class="card-h"><h3>Company</h3></div><dl class="dl notranslate"><dt>Company</dt><dd>${v(c.name)}</dd><dt>Country / City</dt><dd>${c.flag || ""} ${v(c.country)} · ${v(c.city)}</dd><dt>Billing address</dt><dd>${v(c.address)}</dd><dt>VAT</dt><dd class="mono">${v(c.vat)}</dd><dt>Website</dt><dd>${v(c.website)}</dd><dt>Instagram</dt><dd>${v(c.instagram)}</dd></dl>
+  <div class="grid g2"><div class="card"><div class="card-h"><h3>Company</h3></div><dl class="dl notranslate"><dt>Company</dt><dd>${v(c.name)}</dd><dt>Country / City</dt><dd>${c.flag || ""} ${v(c.country)} · ${v(c.city)}</dd><dt>Billing address</dt><dd>${v(c.address)}</dd><dt>Delivery address</dt><dd>${v(c.shipAddress || c.address)}</dd><dt>VAT</dt><dd class="mono">${v(c.vat)}</dd><dt>Website</dt><dd>${v(c.website)}</dd><dt>Instagram</dt><dd>${v(c.instagram)}</dd></dl>
     <div class="card-h mt"><h3>Contact person</h3></div><dl class="dl notranslate"><dt>Name</dt><dd>${v(c.contact)}</dd><dt>Position</dt><dd>${v(c.position)}</dd><dt>E-mail</dt><dd>${v(c.email)}</dd><dt>Phone / WhatsApp</dt><dd>${v(c.phone)}</dd></dl></div>
   <div class="card"><div class="card-h"><h3>Commercial terms</h3></div><dl class="dl"><dt>Payment term</dt><dd>${v(c.payment)}</dd><dt>Shipping term</dt><dd>${v(c.incoterm)}</dd><dt>Your sales rep</dt><dd>${v(c.sales)}</dd></dl>
-  <div class="notice info mt">${ic("info")}<span>Your billing address is filled in automatically on your next order. You can still change it at checkout.</span></div>
+  <div class="notice info mt">${ic("info")}<span>Your billing and delivery addresses are filled in automatically on your next order. You can still change them at checkout.</span></div>
   <div class="card-h mt"><h3>Legal</h3></div>${["kvkk", "privacy", "consent", "cookies", "terms"].map((k) => `<div class="stat-row notranslate"><a class="strong" onclick="legalOpen('${k}')">${LEGAL[k].title[LANG === "tr" ? "tr" : "en"]}</a><span class="muted">v${LEGAL_VERSION}</span></div>`).join("")}</div></div>`; };
-const ACCT_FIELDS = [["name", "Company name", 1], ["country", "Country", 1], ["city", "City", 1], ["address", "Billing address", 1, "span2"], ["vat", "Tax / VAT number", 1], ["website", "Website"], ["instagram", "Instagram"], ["contact", "Contact name", 1], ["position", "Position"], ["phone", "WhatsApp / Phone"]];
+const ACCT_FIELDS = [["name", "Company name", 1], ["country", "Country", 1], ["city", "City", 1], ["address", "Billing address", 1, "span2"], ["shipAddress", "Delivery address", 1, "span2"], ["vat", "Tax / VAT number", 1], ["website", "Website"], ["instagram", "Instagram"], ["contact", "Contact name", 1], ["position", "Position"], ["phone", "WhatsApp / Phone"]];
 function editAccount() {
   const c = C(ME);
-  modal(`<h2>Edit details</h2><div class="form cols2">${ACCT_FIELDS.map(([k, l, req, cls]) => `<div class="field ${cls || ""}"><label>${l}${req ? " *" : ""}</label>${k === "address" ? `<textarea class="input" id="ac_${k}" rows="2">${pfEsc(c[k] && c[k] !== "—" ? c[k] : "")}</textarea>` : `<input class="input" id="ac_${k}" value="${pfEsc(c[k] && c[k] !== "—" ? c[k] : "")}">`}</div>`).join("")}</div>
+  modal(`<h2>Edit details</h2><div class="form cols2">${ACCT_FIELDS.map(([k, l, req, cls]) => `<div class="field ${cls || ""}"><label>${l}${req ? " *" : ""}</label>${/address/i.test(k) ? `<textarea class="input" id="ac_${k}" rows="2">${pfEsc(c[k] && c[k] !== "—" ? c[k] : "")}</textarea>` : `<input class="input" id="ac_${k}" value="${pfEsc(c[k] && c[k] !== "—" ? c[k] : "")}">`}</div>`).join("")}</div>
   <p class="muted" style="font-size:12.5px">E-mail (your login) can be changed by your sales representative.</p><p class="err-t" id="acErr" style="font-size:13px"></p>
   <div class="m-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn gold" onclick="saveAccount()">Save</button></div>`);
 }
