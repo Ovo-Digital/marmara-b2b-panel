@@ -32,6 +32,7 @@ function storeChanges() {
   if (!STORE.snap) return null;
   const now = storeSnapshot(), ch = {}, put = (k, v) => (ch[k] ||= []).push(v);
   for (const o of ORDERS) if (now.orders[o.no] !== STORE.snap.orders[o.no]) put("orders", o);
+  for (const no of Object.keys(STORE.snap.orders)) if (!(no in now.orders)) put("orders", { no, _deleted: true });   // silinen sipariş
   for (const c of CUSTOMERS) if (now.customers[c.id] !== STORE.snap.customers[c.id]) put("customers", c);
   for (const r of STORE.regs) if (now.regs[r.u] !== STORE.snap.regs[r.u]) put("regs", r);
   for (const p of PRODUCTS) if (now.products[p.sku] !== STORE.snap.products[p.sku]) put("products", prodDiff(p));

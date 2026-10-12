@@ -26,6 +26,7 @@ const ICONS = {
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
@@ -285,7 +286,7 @@ function render() {
   let [ini, name, role] = USERS_BY_MODE[mode];
   const sess = authSession();
   if (sess && (sess.role === mode || sess.role === "admin")) { name = sess.name; role = sess.title; ini = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(); }
-  $("#modeSwitch").style.display = sess?.role === "admin" ? "" : "none";
+  $("#modeSwitch").style.display = "none";   // admin ve müşteri panelleri ayrı
   $("#avatar").textContent = ini; $("#meName").textContent = name; $("#meRole").textContent = role;
   $("#sideTag").textContent = mode === "customer" ? "B2B CUSTOMER PORTAL" : "B2B BACK OFFICE";
   $("#notifBtn").style.display = mode === "admin" ? "" : "none";
@@ -293,7 +294,7 @@ function render() {
 
   // müşteri bildirimi olan siparişi açtıysa: okundu say (menü rozeti bu çizimde düşsün)
   if (mode === "customer" && page === "order") { const fo = O(arg); state.freshNotice = fo?.custNotice && !fo.custNotice.seen && sess?.role === "customer" ? (fo.custNotice.seen = true, arg) : state.freshNotice === arg ? arg : null; }
-  const activeKey = { customer: "customers", order: "orders", application: "customers", product: "products", checkout: "products" }[page] || page;
+  const activeKey = mode === "admin" && ["neworder", "checkout"].includes(page) ? "orders" : { customer: "customers", order: "orders", application: "customers", product: "products", checkout: "products" }[page] || page;
   $("#nav").innerHTML = NAV[mode].map((n) => {
     if (n.length === 1) return `<div class="nav-group">${n[0]}</div>`;
     const [key, label, icon] = n;
@@ -514,12 +515,12 @@ function actRow(tone, icon, label, n, href) {
 
 // En yeni sipariş en üstte (oluşturma zamanı, yoksa sipariş no)
 const sortOrders = (list) => list.slice().sort((a, b) => (b.created || "").localeCompare(a.created || "") || b.no.localeCompare(a.no));
-function ordersTable(list, en) {
+function ordersTable(list, en, del) {
   if (!list.length) return `<div class="empty">Bu filtrede sipariş yok.</div>`;
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sipariş</th>${en ? "" : "<th>Müşteri</th>"}<th>Tarih</th>${en ? "" : "<th>Müşteri PO</th>"}<th class="r">Tutar</th><th>${en ? "Payment" : "Ödeme"}</th><th>${en ? "Status" : "Durum"}</th></tr></thead><tbody>
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sipariş</th>${en ? "" : "<th>Ülke</th><th>Müşteri</th>"}<th>Tarih</th>${en ? "" : "<th>Müşteri PO</th>"}<th class="r">Tutar</th><th>${en ? "Payment" : "Ödeme"}</th><th>${en ? "Status" : "Durum"}</th>${del ? "<th></th>" : ""}</tr></thead><tbody>
   ${sortOrders(list).map((o) => { const c = C(o.cust), ps = payState(o); return `<tr class="click" data-oq="${pfEsc(`${o.no} ${c.name} ${c.country} ${o.po || ""}`)}" data-stage="${o.stage}" data-cust="${o.cust}" onclick="go('${en ? "customer" : "admin"}/order/${o.no}')">
-    <td class="mono strong">${o.no}</td>${en ? "" : `<td>${c.flag} ${c.name}</td>`}<td class="muted">${o.date}</td>${en ? "" : `<td class="mono muted">${o.po && o.po !== o.no ? o.po : "—"}</td>`}
-    <td class="r strong">${money(orderTotal(o), o.currency)}</td><td><span class="pill ${ps[1]}">${en ? ps[0] : ps[2]}</span></td><td>${stagePill(o.stage, en)}${o.problem && !en ? ` <span class="pill err plain">Problem</span>` : ""}</td></tr>`; }).join("")}
+    <td class="mono strong">${o.no}</td>${en ? "" : `<td>${c.flag || ""} ${c.country || "—"}</td><td>${c.name}</td>`}<td class="muted">${o.date}</td>${en ? "" : `<td class="mono muted">${o.po && o.po !== o.no ? o.po : "—"}</td>`}
+    <td class="r strong">${money(orderTotal(o), o.currency)}</td><td><span class="pill ${ps[1]}">${en ? ps[0] : ps[2]}</span></td><td>${stagePill(o.stage, en)}${o.problem && !en ? ` <span class="pill err plain">Problem</span>` : ""}</td>${del ? `<td class="r" onclick="event.stopPropagation()"><button class="btn sm ghost" title="Siparişi sil" onclick="deleteOrder('${o.no}')">${ic("trash")}</button></td>` : ""}</tr>`; }).join("")}
   </tbody></table></div>`;
 }
 
@@ -647,7 +648,7 @@ ADMIN.customer = (id) => {
   else if (tab === "forecast") body = `<div class="card"><div class="stat-row"><span>Ekim 2026</span><b>${c.forecast ? money(c.forecast) + " · High" : "Girilmedi"}</b></div><div class="stat-row"><span>Kasım 2026</span><b>$18,000 · Medium</b></div><div class="stat-row"><span>Aralık 2026</span><b>$30,000 · Low</b></div></div>`;
   else if (tab === "docs") body = `<div class="card">${docsTable(false, c)}</div>`;
   else body = `<div class="card"><ul class="tl"><li>Fuar görüşmesi: 2027 için 40' konteyner hedefi konuşuldu.<small>Ferhat · 14 Sep 2026</small></li><li>Almanya'da Noir EDP talebi yüksek, katalog istendi.<small>Ferhat · 02 Sep 2026</small></li><li>Hesap açıldı.<small>Sistem · 11 Jan 2025</small></li></ul><textarea class="input mt" placeholder="Not ekle…"></textarea></div>`;
-  return `${head(`${c.flag} ${c.name}`, `${c.country} · ${c.type} · ${c.id}`, `${custBalance(c.id) > 0.005 ? `<span class="pill warn" style="cursor:pointer" onclick="state.tab.cust='finance';rerender()">Açık bakiye ${money(custBalance(c.id), levelCur(levelOf(c.id)), 2)}</span>` : '<span class="pill ok">Bakiye yok</span>'}<span class="pill ok">Aktif</span><button class="btn" onclick="go('customer/dashboard')">${ic("user")} Müşteri gözünden gör</button><button class="btn gold" onclick="newOrderFor('${c.id}')">${ic("plus")} Sipariş Oluştur</button>`, `<a href="#/admin/customers">Müşteriler</a> / ${c.id}`)}
+  return `${head(`${c.flag} ${c.name}`, `${c.country} · ${c.type} · ${c.id}`, `${custBalance(c.id) > 0.005 ? `<span class="pill warn" style="cursor:pointer" onclick="state.tab.cust='finance';rerender()">Açık bakiye ${money(custBalance(c.id), levelCur(levelOf(c.id)), 2)}</span>` : '<span class="pill ok">Bakiye yok</span>'}<span class="pill ok">Aktif</span><button class="btn gold" onclick="newOrderFor('${c.id}')">${ic("plus")} Sipariş Oluştur</button>`, `<a href="#/admin/customers">Müşteriler</a> / ${c.id}`)}
   <div class="tabs">${tabs.map(([k, l]) => `<button class="${tab === k ? "on" : ""}" onclick="state.tab.cust='${k}';rerender()">${l}</button>`).join("")}</div>${body}`;
 };
 
@@ -663,8 +664,19 @@ ADMIN.orders = () => {
     <select onchange="${set("stage")}"><option value="all">Tüm durumlar</option>${STAGES.map((x, i) => `<option value="${i}" ${f.stage === String(i) ? "selected" : ""}>${x} (${ORDERS.filter((o) => o.stage === i).length})</option>`).join("")}</select>
     <span class="pf-n muted" id="ofN"></span>
   </div>
-  <div class="card">${ordersTable(ORDERS)}<div class="pf-empty muted" id="ofEmpty" style="display:none">Bu filtrede sipariş yok.</div></div>`;
+  <div class="card">${ordersTable(ORDERS, false, true)}<div class="pf-empty muted" id="ofEmpty" style="display:none">Bu filtrede sipariş yok.</div></div>`;
 };
+function deleteOrder(no) {
+  const o = O(no), c = C(o.cust);
+  modal(`<h2>Siparişi sil</h2><p><b class="mono">${no}</b> · ${pfEsc(c?.name || "")} · ${money(orderTotal(o), o.currency, 2)} · ${STAGES[o.stage]}</p>
+  <div class="notice err">${ic("alert")}<span>Sipariş, kalemleri, ödemeleri ve aktivite kaydıyla birlikte <b>kalıcı olarak</b> silinir; müşteri de göremez. Bu işlem geri alınamaz.</span></div>
+  <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn danger" onclick="confirmDeleteOrder('${no}')">${ic("trash")} Kalıcı olarak sil</button></div>`);
+}
+function confirmDeleteOrder(no) {
+  const i = ORDERS.findIndex((x) => x.no === no); if (i < 0) return closeModal();
+  ORDERS.splice(i, 1); delete state.logs[no];
+  closeModal(); toast(`${no} silindi`, "trash"); if (parse().page === "order") go("admin/orders"); else rerender();
+}
 function orderFilter() {
   if (!$("#of")) return;
   const f = state.of, rows = [...document.querySelectorAll("#view [data-oq]")];
@@ -674,7 +686,7 @@ function orderFilter() {
   $("#ofEmpty").style.display = n ? "none" : "";
 }
 // Admin: müşteri adına sipariş → müşteri seçilerek ürün ekranı açılır
-function newOrderFor(id) { state.actAs = id || null; state.cart = {}; if (id) ME = id; go("customer/products"); }
+function newOrderFor(id) { state.actAs = id || null; state.cart = {}; if (id) ME = id; go("admin/neworder"); }
 function setActAs(id) { state.actAs = id || null; if (id) ME = id; rerender(); }
 const actAsBar = () => {
   if (authSession()?.role !== "admin") return "";
@@ -895,7 +907,7 @@ function plHtml(no) {
     .inv{text-align:right;margin:-10px 0 14px}.pl table{width:100%;border-collapse:collapse}.pl th{background:#b7b7b7;border:1px solid #444;padding:6px;font-size:9.5pt}.pl td{border:1px solid #444;padding:4px 6px;font-size:9pt}
     .pl .tot td{background:#b7b7b7;font-weight:700;text-align:center}.pl tr{break-inside:avoid}.pl thead{display:table-header-group}
     @page{size:A4 landscape;margin:12mm;@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Arial;color:#555}}</style></head>
-  <body><div class="tools"><button onclick="opener&&opener.plDownload('${no}','xlsx')">Download XLSX</button><button onclick="opener&&opener.plDownload('${no}','csv')">CSV</button><button onclick="pdfDownload()">PDF</button><button onclick="print()">Print</button></div>${pdfScript(`PackingList_${X.invNo}`, "landscape")}
+  <body><div class="tools"><button onclick="(window.opener||window.parent).plDownload('${no}','xlsx')">Download XLSX</button><button onclick="(window.opener||window.parent).plDownload('${no}','csv')">CSV</button><button onclick="pdfDownload()">PDF</button><button onclick="print()">Print</button></div>${pdfScript(`PackingList_${X.invNo}`, "landscape")}
   <div class="sheet pl" style="width:297mm;min-height:auto">
     <img src="${new URL("senso-logo.png", location.href).href}" alt="Senso">
     <pre>${pfEsc(X.seller).replace(/^SELLER :/, "<b>SELLER :</b>")}</pre>
@@ -930,11 +942,17 @@ async function plDownload(no, fmt) {
   XLSX.writeFile(wb, file + ".xlsx");
   toast("Packing list XLSX indirildi", "download");
 }
+// Belgeler panel içinde tam ekran açılır (WhatsApp / Instagram içi tarayıcılar ve açılır pencere engelleyiciler yeni pencereyi engelliyor)
 function openDoc(no, type) {
-  const w = window.open("", "_blank");
-  if (!w) { toast("Açılır pencere engellendi — tarayıcıda izin verin", "alert"); return; }
-  w.document.write(docHtml(no, type)); w.document.close();
+  closeDoc();
+  const v = document.createElement("div"); v.id = "docView";
+  v.innerHTML = `<div class="dv-bar"><b>${DOCS[type]} · ${pfEsc(no)}</b><span class="row" style="gap:8px"><button class="btn sm" onclick="docNewTab('${no}','${type}')">${ic("copy")} Yeni sekme</button><button class="btn sm" onclick="closeDoc()">${ic("x")} Kapat</button></span></div><iframe title="${DOCS[type]}"></iframe>`;
+  document.body.appendChild(v); document.body.classList.add("dv-on");
+  v.querySelector("iframe").srcdoc = docHtml(no, type);
 }
+function closeDoc() { $("#docView")?.remove(); document.body.classList.remove("dv-on"); }
+function docNewTab(no, type) { const w = window.open("", "_blank"); if (!w) return toast("Yeni sekme engellendi — belge bu ekranda açık", "alert"); w.document.write(docHtml(no, type)); w.document.close(); }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#docView")) closeDoc(); });
 
 // ——— Fiyatlandırma ———
 function pricingTable(lvl) {
@@ -1483,7 +1501,7 @@ function cartPanel() {
     <div class="total">${money(total, levelCur(levelOf(ME)), 2)}</div>
     <div class="mt"><div class="stat-row"><span>Boxes</span><b>${num(Q.boxes)}</b></div><div class="stat-row"><span>Pieces</span><b>${num(Q.pcs)}</b></div></div>
     ${items.length ? "" : `<div class="notice info mt">${ic("info")}<span>Add boxes to start your order.</span></div>`}
-    <button class="btn primary block lg mt" ${items.length && !actAsMissing() ? "" : "disabled"} onclick="go('customer/checkout')">REVIEW ORDER ${ic("chevR")}</button>
+    <button class="btn primary block lg mt" ${items.length && !actAsMissing() ? "" : "disabled"} onclick="go(state.mode + '/checkout')">REVIEW ORDER ${ic("chevR")}</button>
     ${actAsMissing() ? `<small class="warn-t">Önce müşteri seçin</small>` : ""}
   </div>`;
 }
@@ -1491,10 +1509,11 @@ function cartPanel() {
 CUST.checkout = () => {
   const items = cartItems(), cur = levelCur(levelOf(ME)), c = C(ME);
   const total = items.reduce((s, [sku, b]) => s + lineTotal(sku, b), 0);
-  return `${head("Checkout", "", "", `<a href="#/customer/products">Products</a> / Checkout`)}
+  const pp = state.mode === "admin" ? "admin/neworder" : "customer/products";
+  return `${head("Checkout", "", "", `<a href="#/${pp}">Products</a> / Checkout`)}
   ${actAsBar()}
   <div class="grid g-side"><div>
-    <div class="card"><div class="card-h"><h3>Order Review</h3><a class="sub" href="#/customer/products">Edit</a></div>
+    <div class="card"><div class="card-h"><h3>Order Review</h3><a class="sub" href="#/${pp}">Edit</a></div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Unit</th><th class="r">Total</th></tr></thead><tbody>
       ${items.map(([sku, b]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r muted">${money(custPrice(p), cur, 2)}</td><td class="r strong">${money(lineTotal(sku, b), cur, 2)}</td></tr>`; }).join("")}
       </tbody></table></div></div>
@@ -1541,6 +1560,8 @@ function reorder(no) {
   toast(off.length ? `Copied · ${off.length} discontinued product(s) skipped` : "Order copied with current prices", off.length ? "alert" : "copy");
   go("customer/products");
 }
+ADMIN.neworder = () => CUST.products();
+ADMIN.checkout = () => CUST.checkout();
 CUST.contact = () => {
   const c = C(ME), key = (c.sales || "").split(" ")[0], rep = ACCOUNTS.find((a) => a.name.split(" ")[0] === key), r = CONTACT.reps[key] || {};
   const row = (i, l, v, href) => `<div class="stat-row"><span>${ic(i)} ${l}</span>${href ? `<a class="strong notranslate" href="${href}">${v}</a>` : `<b class="notranslate">${v}</b>`}</div>`;

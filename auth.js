@@ -1,5 +1,5 @@
 // Giriş / üye ol — demo: hesaplar tarayıcıda tutulur (gerçek sistemde sunucuda doğrulanacak).
-// Rol: admin → tüm panel (görünümler arası geçiş), customer → sadece müşteri portalı.
+// Rol: admin → yalnız admin paneli, customer → yalnız müşteri portalı (paneller ayrı).
 
 const ACCOUNTS = [
   { u: "admin", p: "senso2026", role: "admin", name: "Volkan Koçkan", title: "Super Admin" },
@@ -25,7 +25,7 @@ function authGuard() {
   if (!s) { authRender(); return false; }
   $("#auth").innerHTML = "";
   const { mode } = parse();
-  if (s.role !== "admin" && mode !== s.role) { location.replace("#/" + HOME[s.role]); return false; }
+  if (mode !== s.role) { location.replace("#/" + HOME[s.role]); return false; }   // admin ve müşteri panelleri ayrı: herkes yalnız kendi paneline girer
   if (s.role === "customer") ME = s.cust;
   if (s.dash && !state.dashSet) { state.dashRole = s.dash; state.dashSet = true; }
   return true;
