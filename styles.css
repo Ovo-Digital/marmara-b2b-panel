@@ -483,3 +483,9 @@ body.auth-on .app, body.auth-on .rv-fab, body.auth-on .rv-banner { display: none
 #logoutBtn { width: auto; padding: 0 12px; gap: 6px; display: flex; align-items: center; font-size: 13px; font-weight: 500; }
 #logoutBtn .ic { width: 17px; height: 17px; }
 @media (max-width: 760px) { .pf-n { margin-left: 0; width: 100%; } .pf select { flex: 1 1 40%; } #logoutBtn span { display: none; } }
+
+/* admin: müşteri adına sipariş */
+.act-as { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 14px 18px; }
+.act-as > span { color: var(--accent); display: grid; }
+.act-as select { width: auto; min-width: 260px; height: 38px; }
+.act-as.need { border-color: var(--warn); background: var(--warn-bg); }
