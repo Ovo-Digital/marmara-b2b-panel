@@ -14,7 +14,7 @@ let authView = "login";
 
 const authGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const authSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-const authSession = () => { const s = authGet(AUTH_KEY, null); return s && HOME[s.role] ? s : null; };   // kaldırılmış rol (fabrika) oturumu geçersiz
+const authSession = () => { const s = authGet(AUTH_KEY, null); return s && HOME[s.role] && s.token ? s : null; };   // anahtarsız eski oturum / kaldırılmış rol geçersiz → yeniden giriş
 let authPending = null;   // şifre belirleme ekranı için { u, company }
 async function authApi(body) {
   const r = await fetch(authUrl(), { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
