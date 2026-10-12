@@ -9,6 +9,14 @@ const STORE = {
 };
 // Katalog (catalog.js) ürünlerinin ilk hâli: depodaki ürün düzenlemeleri bunun üzerine uygulanır
 const PRODUCTS_BASE = JSON.stringify(PRODUCTS);
+const BASE_BY_SKU = Object.fromEntries(JSON.parse(PRODUCTS_BASE).map((p) => [p.sku, p]));
+// Depoya ürünün tamamı değil, yalnız katalogdan farklı alanlar gider (katalog güncellenince — GTİP, görsel, ağırlık — eski kopya üstüne yazmasın)
+const prodDiff = (p) => {
+  const b = BASE_BY_SKU[p.sku]; if (!b) return { ...p, _new: true };
+  const d = { sku: p.sku };
+  for (const k of Object.keys(p)) if (JSON.stringify(p[k]) !== JSON.stringify(b[k])) d[k] = p[k];
+  return d;
+};
 const storeUrl = () => STORE.api + (STORE.ns ? `?ns=${encodeURIComponent(STORE.ns)}` : "");
 
 function storeSnapshot() {
@@ -16,7 +24,7 @@ function storeSnapshot() {
   ORDERS.forEach((o) => (s.orders[o.no] = JSON.stringify(o)));
   CUSTOMERS.forEach((c) => (s.customers[c.id] = JSON.stringify(c)));
   STORE.regs.forEach((r) => (s.regs[r.u] = JSON.stringify(r)));
-  PRODUCTS.forEach((p) => (s.products[p.sku] = JSON.stringify(p)));
+  PRODUCTS.forEach((p) => (s.products[p.sku] = JSON.stringify(prodDiff(p))));
   for (const m of ["logs", "prep", "palletCheck", "meta"]) for (const [k, v] of Object.entries(state[m] || {})) s[m][k] = JSON.stringify(v);
   return s;
 }
@@ -26,7 +34,7 @@ function storeChanges() {
   for (const o of ORDERS) if (now.orders[o.no] !== STORE.snap.orders[o.no]) put("orders", o);
   for (const c of CUSTOMERS) if (now.customers[c.id] !== STORE.snap.customers[c.id]) put("customers", c);
   for (const r of STORE.regs) if (now.regs[r.u] !== STORE.snap.regs[r.u]) put("regs", r);
-  for (const p of PRODUCTS) if (now.products[p.sku] !== STORE.snap.products[p.sku]) put("products", p);
+  for (const p of PRODUCTS) if (now.products[p.sku] !== STORE.snap.products[p.sku]) put("products", prodDiff(p));
   for (const m of ["logs", "prep", "palletCheck", "meta"]) for (const [k, v] of Object.entries(now[m])) if (v !== STORE.snap[m][k]) (ch[m] ||= {})[k] = state[m][k];
   return Object.keys(ch).length ? ch : null;
 }
@@ -35,7 +43,7 @@ function storeApply(doc) {
   CUSTOMERS.splice(0, CUSTOMERS.length, ...doc.customers);
   STORE.regs = doc.regs || [];
   const prods = JSON.parse(PRODUCTS_BASE);
-  for (const p of doc.products || []) { const i = prods.findIndex((x) => x.sku === p.sku); if (i >= 0) prods[i] = p; else prods.push(p); }
+  for (const p of doc.products || []) { const i = prods.findIndex((x) => x.sku === p.sku); const { _new, ...v } = p; if (i >= 0) Object.assign(prods[i], v); else prods.push(v); }
   PRODUCTS.splice(0, PRODUCTS.length, ...prods);
   state.logs = doc.logs || {}; state.prep = doc.prep || {}; state.palletCheck = doc.palletCheck || {}; state.meta = doc.meta || {};
   STORE.rev = doc.rev; STORE.snap = storeSnapshot();
