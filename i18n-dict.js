@@ -1,5 +1,12 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Billing Address": {"tr":"Fatura Adresi","en":"Billing Address","es":"Dirección de facturación","de":"Rechnungsadresse","ru":"Адрес для счёта"},
+  "Billing address": {"tr":"Fatura adresi","en":"Billing address","es":"Dirección de facturación","de":"Rechnungsadresse","ru":"Адрес для счёта"},
+  "Billing address *": {"tr":"Fatura adresi *","en":"Billing address *","es":"Dirección de facturación *","de":"Rechnungsadresse *","ru":"Адрес для счёта *"},
+  "From your registration — edit if needed for this order.": {"tr":"Kayıt bilgilerinizden — bu sipariş için gerekirse düzenleyin.","en":"From your registration — edit if needed for this order.","es":"De su registro — edítela si es necesario para este pedido.","de":"Aus Ihrer Registrierung — bei Bedarf für diese Bestellung ändern.","ru":"Из регистрации — при необходимости измените для этого заказа."},
+  "Deliver to a different address": {"tr":"Farklı bir adrese teslim edilsin","en":"Deliver to a different address","es":"Entregar en otra dirección","de":"An eine andere Adresse liefern","ru":"Доставить по другому адресу"},
+  "Street, no, postal code, city, country": {"tr":"Sokak, no, posta kodu, şehir, ülke","en":"Street, no, postal code, city, country","es":"Calle, n.º, código postal, ciudad, país","de":"Straße, Nr., PLZ, Stadt, Land","ru":"Улица, дом, индекс, город, страна"},
+  "Your billing address is filled in automatically on your next order. You can still change it at checkout.": {"tr":"Fatura adresiniz bir sonraki siparişinizde otomatik gelir. Ödeme adımında yine değiştirebilirsiniz.","en":"Your billing address is filled in automatically on your next order. You can still change it at checkout.","es":"Su dirección de facturación se rellena automáticamente en su próximo pedido. Puede cambiarla al finalizar.","de":"Ihre Rechnungsadresse wird bei der nächsten Bestellung automatisch übernommen. Sie können sie an der Kasse ändern.","ru":"Адрес для счёта подставится в следующем заказе автоматически. Его можно изменить при оформлении."},
   "Discount": {"tr":"İndirim","en":"Discount","es":"Descuento","de":"Rabatt","ru":"Скидка"},
   "Additional charge": {"tr":"Ek bedel","en":"Additional charge","es":"Cargo adicional","de":"Zusatzkosten","ru":"Доп. расход"},
   "Ek Bedel / İndirim": {"tr":"Ek Bedel / İndirim","en":"Extra Charge / Discount","es":"Cargo extra / Descuento","de":"Zuschlag / Rabatt","ru":"Доплата / Скидка"},

@@ -32,6 +32,7 @@ function authGuard() {
 }
 
 async function authLogin() {
+  state.cart = {}; state.actAs = null;   // her girişte boş sepet
   const u = $("#auU").value.trim().toLocaleLowerCase("tr"), p = $("#auP").value;
   const err = (m) => { $("#auErr").className = "auth-err"; $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
   await STORE.ready;
@@ -98,7 +99,7 @@ function authRender() {
       <div class="form cols2">
         ${f("Company name", "rgName", "text", 1)}${s("Country", "rgCountry", ["Germany", "France", "Sweden", "USA", "UAE", "Saudi Arabia", "Lithuania", "Romania"])}
         ${f("City", "rgCity")}${f("Tax / VAT number", "rgVat", "text", 1)}
-        <div class="field span2"><label>Address *</label><textarea class="input" id="rgAddr" rows="2" placeholder="Street, no, postal code, city"></textarea></div>
+        <div class="field span2"><label>Billing address *</label><textarea class="input" id="rgAddr" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div>
         ${s("Company type", "rgType", ["Distributor", "Wholesaler", "Barber Chain", "Retail Chain"])}<div class="field"><label>Instagram</label><input class="input" id="rgIg" placeholder="@hesabiniz"></div>
         <div class="field span2"><label>Web siteniz var mı?</label><div class="seg" style="max-width:260px"><button type="button" id="rgWebY" onclick="authWeb(true)">Evet</button><button type="button" id="rgWebN" class="on" onclick="authWeb(false)">Hayır</button></div></div>
         <div class="field span2" id="rgWebBox" style="display:none"><label>Web sitesi adresi *</label><input class="input" id="rgWeb" type="url" placeholder="https://www.ornek.com"></div>

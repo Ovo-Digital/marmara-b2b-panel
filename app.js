@@ -201,7 +201,7 @@ function suggestions(items, target) {
 // ——— durum ———
 const state = {
   mode: "admin",
-  cart: { "BC-400-2": 24, "BSG-1000-77": 20, "BS-1150-KRT": 16, "BW-150-MAT-1018": 30, "BW-20-SKL": 20, "BSS-200 - PS": 10 },
+  cart: {},
   cartTarget: "pallet",
   filter: { orders: -1, customers: "all", brand: "all", cat: "all", stock: "all", q: "" },
   pf: { brand: "all", cat: "all", stock: "all", act: "all", q: "" },
@@ -549,7 +549,7 @@ const custInfoDl = (c) => {
   const v = (x) => (x && x !== "—" ? pfEsc(x) : '<span class="dim">—</span>');
   const link = (u) => (u && u !== "—" ? `<a href="${/^https?:/.test(u) ? pfEsc(u) : "https://" + pfEsc(u)}" target="_blank" rel="noopener">${pfEsc(u)}</a>` : v(u));
   const ig = (x) => (x && x !== "—" ? `<a href="https://instagram.com/${pfEsc(x.replace(/^@/, ""))}" target="_blank" rel="noopener">${pfEsc(x)}</a>` : v(x));
-  const rows = [["Firma", v(c.name)], ["Firma tipi", v(c.type)], ["Ülke / Şehir", `${c.flag || ""} ${v(c.country)} · ${v(c.city)}`], ["Adres", v(c.address)], ["VAT / Vergi no", `<span class="mono">${v(c.vat)}</span>`],
+  const rows = [["Firma", v(c.name)], ["Firma tipi", v(c.type)], ["Ülke / Şehir", `${c.flag || ""} ${v(c.country)} · ${v(c.city)}`], ["Fatura adresi", v(c.address)], ["VAT / Vergi no", `<span class="mono">${v(c.vat)}</span>`],
     ["Yetkili kişi", v(c.contact)], ["Pozisyon", v(c.position)], ["E-posta", c.email ? `<a href="mailto:${pfEsc(c.email)}">${pfEsc(c.email)}</a>` : v("")], ["Telefon / WhatsApp", v(c.phone)],
     ["Web sitesi", link(c.website)], ["Instagram", ig(c.instagram)], ["İlgilendiği markalar", v(c.brands)], ["Başvuru tarihi", v(c.applied)],
     ["Yasal onaylar", c.consents ? `KVKK ✓ · Koşullar ✓ · Pazarlama ${c.consents.marketing ? "✓" : "✗"} <small class="muted">(v${c.consents.version})</small>` : v("")], ["Son güncelleme", v(c.updated)]];
@@ -724,7 +724,8 @@ ADMIN.order = (no) => {
   else action = `<div class="card-h"><h3>Sevk Edildi</h3><span class="pill plain">Tamamlandı</span></div><div class="stat-row"><span>Sevk tarihi</span><b>${o.ship?.date || "—"}</b></div>`;
 
   return `${head(`${no}`, `${c.flag} ${c.name} · ${money(total, o.currency)}`, `${stagePill(o.stage)}${docButtons(o)}`, `<a href="#/admin/orders">Siparişler</a> / ${no}`)}
-  <div class="card">${stepper(o.stage, STAGES)}</div>
+  <div class="card">${stepper(o.stage, STAGES)}
+    <div class="stage-edit"><span class="muted">Durumu elle değiştir</span><select class="input" id="stSel">${STAGES.map((x, i) => `<option value="${i}" ${i === o.stage ? "selected" : ""}>${i + 1}. ${x}</option>`).join("")}</select><button class="btn sm" onclick="setStageManual('${no}')">Uygula</button></div></div>
   <div class="grid g-side mt">
     <div>
       ${o.note || o.po ? `<div class="card note-card"><div class="card-h"><h3>${ic("edit")} Müşteri Notu</h3>${o.po ? `<span class="pill plain">PO: ${o.po}</span>` : ""}</div>${o.note ? `<p class="notranslate">${o.note.replace(/</g, "&lt;")}</p>` : ""}</div>` : ""}
@@ -748,7 +749,7 @@ ADMIN.order = (no) => {
     <div>
       <div class="card">${action}</div>
       <div class="card mt"><div class="card-h"><h3>Ticari Şartlar</h3></div>
-        <div class="stat-row"><span>Teslim</span><b>${c.incoterm}</b></div><div class="stat-row"><span>Ödeme</span><b>${c.payment}</b></div><div class="stat-row"><span>Fiyat seviyesi</span><select class="input" style="height:32px;width:auto;max-width:210px" ${o.stage >= 5 ? "disabled" : ""} onchange="setOrderLevel('${o.no}',this.value)">${LEVELS.map((l) => `<option value="${l.id}" ${l.id === orderLevel(o) ? "selected" : ""}>${l.name}</option>`).join("")}</select></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Banka</span><b>${o.currency} Bank A</b></div><div class="stat-row"><span>Teslimat adresi</span><b class="notranslate" style="text-align:right;max-width:230px">${pfEsc(o.address || custAddress(c))}</b></div></div>
+        <div class="stat-row"><span>Teslim</span><b>${c.incoterm}</b></div><div class="stat-row"><span>Ödeme</span><b>${c.payment}</b></div><div class="stat-row"><span>Fiyat seviyesi</span><select class="input" style="height:32px;width:auto;max-width:210px" ${o.stage >= 5 ? "disabled" : ""} onchange="setOrderLevel('${o.no}',this.value)">${LEVELS.map((l) => `<option value="${l.id}" ${l.id === orderLevel(o) ? "selected" : ""}>${l.name}</option>`).join("")}</select></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Banka</span><b>${o.currency} Bank A</b></div><div class="stat-row"><span>Fatura adresi</span><b class="notranslate" style="text-align:right;max-width:230px">${pfEsc(o.billAddress || custAddress(c))}</b></div><div class="stat-row"><span>Teslimat adresi</span><b class="notranslate" style="text-align:right;max-width:230px">${pfEsc(o.address || o.billAddress || custAddress(c))}</b></div></div>
     </div>
   </div>`;
 };
@@ -763,6 +764,23 @@ function addAdj(no) {
 function removeAdj(no, i) {
   const o = O(no), a = o.adjust[i]; o.adjust.splice(i, 1);
   log(no, `${a.amount < 0 ? "İndirim" : "Ek bedel"} kaldırıldı: ${a.label}`); toast("Kaldırıldı · yeni toplam " + money(orderTotal(o), o.currency, 2)); rerender();
+}
+function setStageManual(no) {
+  const o = O(no), to = +$("#stSel").value;
+  if (to === o.stage) return toast("Sipariş zaten bu durumda", "info");
+  modal(`<h2>Durumu değiştir</h2><p><b class="mono">${no}</b>: ${STAGES[o.stage]} → <b>${STAGES[to]}</b></p>
+  ${to < o.stage ? `<div class="notice warn">${ic("alert")}<span>Sipariş geri alınıyor.${o.stage === 5 ? " Sevk kaydı kaldırılır." : ""}${to < 4 && o.stage >= 4 ? " Müşteri final proforma / packing list’i bu durumda göremez." : ""}</span></div>` : ""}
+  <div class="field mt"><label>Not (isteğe bağlı)</label><input class="input" id="stNote" placeholder="Ör. yanlışlıkla sevk edildi işaretlendi"></div>
+  <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="applyStage('${no}',${to})">Değiştir</button></div>`);
+}
+function applyStage(no, to) {
+  const o = O(no), from = o.stage, note = $("#stNote").value.trim();
+  o.stage = to;
+  if (to < 5) delete o.ship;
+  if (to >= 2 && !o.piDate) o.piDate = fmtDate(new Date());
+  if (to === 5 && !o.ship) o.ship = { date: fmtDate(new Date()) };
+  log(no, `Durum elle değiştirildi: ${STAGES[from]} → ${STAGES[to]}${note ? " · " + note : ""}`);
+  closeModal(); toast(`Durum: ${STAGES[to]}`, "refresh"); rerender();
 }
 function advance(no, dir = 1) {
   const o = O(no);
@@ -846,7 +864,7 @@ function docHtml(no, type) {
     <div class="dt"><h1>${title}</h1>${draft ? `<span class="draft">DRAFT — ${isPI ? "pending final approval" : "not yet shipped"}</span>` : ""}</div></header>
   <div class="contact">${COMPANY.phone}  |  ${COMPANY.email}  |  ${COMPANY.web}</div>
   <section class="meta"><div>${kv(meta.slice(0, 4))}</div><div>${kv(meta.slice(4))}</div></section>
-  <section class="parties"><div><h4>BILL TO</h4><b>${pfEsc(c.name)}</b>${c.address ? `<span>${pfEsc(c.address)}</span>` : ""}<span>${pfEsc([c.city, c.country].filter((x) => x && x !== "—").join(", "))}</span><span>Tax / VAT ID: ${pfEsc(c.vat || "—")}</span></div>
+  <section class="parties"><div><h4>BILL TO</h4><b>${pfEsc(c.name)}</b>${o.billAddress || c.address ? `<span>${pfEsc(o.billAddress || c.address)}</span>` : ""}${(o.billAddress || c.address || "").includes(c.country || "@@") ? "" : `<span>${pfEsc([c.city, c.country].filter((x) => x && x !== "—").join(", "))}</span>`}<span>Tax / VAT ID: ${pfEsc(c.vat || "—")}</span></div>
     <div><h4>SHIP TO</h4><b>${pfEsc(c.name)}</b><span>${pfEsc(D.addr)}</span>${D.addr.includes(c.country || "@@") ? "" : `<span>${pfEsc(c.country || "")}</span>`}<span>Contact: ${pfEsc([c.contact, c.phone && c.phone !== "—" ? c.phone : ""].filter(Boolean).join(" / ") || "—")}</span></div></section>
   <table class="items"><thead><tr><th>SKU</th><th>DESCRIPTION</th><th class="r">CARTONS</th><th class="r">QTY</th><th class="r">UNIT PRICE</th><th class="r">TOTAL</th></tr></thead><tbody>
     ${rows.map((r) => `<tr><td>${pfEsc(r.sku)}</td><td>${pfEsc(r.p.name.toUpperCase())}</td><td class="r">${num(r.q)}</td><td class="r">${num(r.pcs)}</td><td class="r">${n2(r.up)}</td><td class="r">${n2(r.line)}</td></tr>`).join("")}
@@ -1517,7 +1535,9 @@ CUST.checkout = () => {
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="c">Boxes</th><th class="r">Pcs</th><th class="r">Unit</th><th class="r">Total</th></tr></thead><tbody>
       ${items.map(([sku, b]) => { const p = P(sku); return `<tr><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${sku}</small></div></div></td><td class="c">${b}</td><td class="r muted">${num(b * p.pcsBox)}</td><td class="r muted">${money(custPrice(p), cur, 2)}</td><td class="r strong">${money(lineTotal(sku, b), cur, 2)}</td></tr>`; }).join("")}
       </tbody></table></div></div>
-    <div class="card mt"><div class="form"><div class="field"><label>Delivery Address</label><textarea class="input notranslate" id="ckAddr" rows="2">${pfEsc(custAddress(c))}</textarea><small class="muted">Registered address — edit if this order goes elsewhere.</small></div><div class="field"><label>Order Notes</label><textarea class="input" id="ckNote" placeholder="Optional…"></textarea></div></div></div>
+    <div class="card mt"><div class="form"><div class="field"><label>Billing Address</label><textarea class="input notranslate" id="ckBill" rows="2">${pfEsc(custAddress(c))}</textarea><small class="muted">From your registration — edit if needed for this order.</small></div>
+      <label class="checks" style="margin:2px 0 4px"><label><input type="checkbox" id="ckShipDiff" onchange="$('#ckShipBox').style.display=this.checked?'':'none'"> Deliver to a different address</label></label>
+      <div class="field" id="ckShipBox" style="display:none"><label>Delivery Address</label><textarea class="input notranslate" id="ckAddr" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div><div class="field"><label>Order Notes</label><textarea class="input" id="ckNote" placeholder="Optional…"></textarea></div></div></div>
   </div>
   <div><div class="card cartp"><div class="card-h"><h3>Order Summary</h3></div>
     <div class="stat-row"><span>Subtotal</span><b>${money(total, cur, 2)}</b></div><div class="stat-row"><span>Shipping term</span><b>EXW Düzce</b></div><div class="stat-row"><span>Payment term</span><b>100% Advance</b></div>
@@ -1530,7 +1550,7 @@ function placeOrder() {
   if (!cartItems().length || actAsMissing()) return;
   const seq = Math.max(148, ...ORDERS.map((o) => +o.no.slice(-4))) + 1, no = "PO-2026-" + String(seq).padStart(4, "0");
   const sess = authSession(), byAdmin = sess?.role === "admin";
-  ORDERS.unshift({ no, po: no, cust: ME, date: fmtDate(new Date()), currency: levelCur(levelOf(ME)), created: new Date().toISOString(), stage: 0, paid: 0, problem: false, items: cartItems().map(([s, b]) => [s, b]), note: $("#ckNote")?.value.trim() || "", address: $("#ckAddr")?.value.trim() || custAddress(C(ME)), by: byAdmin ? sess.name : "" });
+  ORDERS.unshift({ no, po: no, cust: ME, date: fmtDate(new Date()), currency: levelCur(levelOf(ME)), created: new Date().toISOString(), stage: 0, paid: 0, problem: false, items: cartItems().map(([s, b]) => [s, b]), note: $("#ckNote")?.value.trim() || "", billAddress: $("#ckBill")?.value.trim() || custAddress(C(ME)), address: ($("#ckShipDiff")?.checked && $("#ckAddr")?.value.trim()) || $("#ckBill")?.value.trim() || custAddress(C(ME)), by: byAdmin ? sess.name : "" });
   state.logs[no] = [[new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", ""), byAdmin ? `${sess.name} siparişi ${C(ME).name} adına oluşturdu` : `${C(ME).name} siparişi portaldan oluşturdu`]];
   state.cart = {};
   if (byAdmin) { state.actAs = null; toast(`${no} oluşturuldu · ${C(ME).name}`); go("admin/order/" + no); }
@@ -1585,12 +1605,12 @@ CUST.forecast = () => `${head("Forecast", "", `<button class="btn" onclick="toas
 CUST.documents = () => `${head("Document Center", "", `<button class="btn gold" onclick="toast('All available documents are being zipped','download')">${ic("download")} Download All</button>`)}<div class="card">${docsTable(true, C(ME))}</div>`;
 CUST.marketing = () => `${head("Marketing Hub", "", `<button class="btn gold" onclick="toast('Brand kit downloading','download')">${ic("download")} Brand Kit</button>`)}${mkChips(true)}${assetGrid()}`;
 CUST.account = () => { const c = C(ME), v = (x) => (x && x !== "—" ? pfEsc(x) : '<span class="dim">—</span>'); return `${head("Account", c.name, `<button class="btn gold" onclick="editAccount()">${ic("edit")} Edit details</button>`)}
-  <div class="grid g2"><div class="card"><div class="card-h"><h3>Company</h3></div><dl class="dl notranslate"><dt>Company</dt><dd>${v(c.name)}</dd><dt>Country / City</dt><dd>${c.flag || ""} ${v(c.country)} · ${v(c.city)}</dd><dt>Address</dt><dd>${v(c.address)}</dd><dt>VAT</dt><dd class="mono">${v(c.vat)}</dd><dt>Website</dt><dd>${v(c.website)}</dd><dt>Instagram</dt><dd>${v(c.instagram)}</dd></dl>
+  <div class="grid g2"><div class="card"><div class="card-h"><h3>Company</h3></div><dl class="dl notranslate"><dt>Company</dt><dd>${v(c.name)}</dd><dt>Country / City</dt><dd>${c.flag || ""} ${v(c.country)} · ${v(c.city)}</dd><dt>Billing address</dt><dd>${v(c.address)}</dd><dt>VAT</dt><dd class="mono">${v(c.vat)}</dd><dt>Website</dt><dd>${v(c.website)}</dd><dt>Instagram</dt><dd>${v(c.instagram)}</dd></dl>
     <div class="card-h mt"><h3>Contact person</h3></div><dl class="dl notranslate"><dt>Name</dt><dd>${v(c.contact)}</dd><dt>Position</dt><dd>${v(c.position)}</dd><dt>E-mail</dt><dd>${v(c.email)}</dd><dt>Phone / WhatsApp</dt><dd>${v(c.phone)}</dd></dl></div>
   <div class="card"><div class="card-h"><h3>Commercial terms</h3></div><dl class="dl"><dt>Payment term</dt><dd>${v(c.payment)}</dd><dt>Shipping term</dt><dd>${v(c.incoterm)}</dd><dt>Your sales rep</dt><dd>${v(c.sales)}</dd></dl>
-  <div class="notice info mt">${ic("info")}<span>Your address is used as the default delivery address on your next order. You can still change it at checkout.</span></div>
+  <div class="notice info mt">${ic("info")}<span>Your billing address is filled in automatically on your next order. You can still change it at checkout.</span></div>
   <div class="card-h mt"><h3>Legal</h3></div>${["kvkk", "privacy", "consent", "cookies", "terms"].map((k) => `<div class="stat-row notranslate"><a class="strong" onclick="legalOpen('${k}')">${LEGAL[k].title[LANG === "tr" ? "tr" : "en"]}</a><span class="muted">v${LEGAL_VERSION}</span></div>`).join("")}</div></div>`; };
-const ACCT_FIELDS = [["name", "Company name", 1], ["country", "Country", 1], ["city", "City", 1], ["address", "Address", 1, "span2"], ["vat", "Tax / VAT number", 1], ["website", "Website"], ["instagram", "Instagram"], ["contact", "Contact name", 1], ["position", "Position"], ["phone", "WhatsApp / Phone"]];
+const ACCT_FIELDS = [["name", "Company name", 1], ["country", "Country", 1], ["city", "City", 1], ["address", "Billing address", 1, "span2"], ["vat", "Tax / VAT number", 1], ["website", "Website"], ["instagram", "Instagram"], ["contact", "Contact name", 1], ["position", "Position"], ["phone", "WhatsApp / Phone"]];
 function editAccount() {
   const c = C(ME);
   modal(`<h2>Edit details</h2><div class="form cols2">${ACCT_FIELDS.map(([k, l, req, cls]) => `<div class="field ${cls || ""}"><label>${l}${req ? " *" : ""}</label>${k === "address" ? `<textarea class="input" id="ac_${k}" rows="2">${pfEsc(c[k] && c[k] !== "—" ? c[k] : "")}</textarea>` : `<input class="input" id="ac_${k}" value="${pfEsc(c[k] && c[k] !== "—" ? c[k] : "")}">`}</div>`).join("")}</div>
