@@ -1,5 +1,6 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Üye ol": {"tr":"Üye ol","en":"Sign up","es":"Registrarse","de":"Registrieren","ru":"Регистрация"},
   "Delivery address *": {"tr":"Teslimat adresi *","en":"Delivery address *","es":"Dirección de entrega *","de":"Lieferadresse *","ru":"Адрес доставки *"},
   "Same as billing address": {"tr":"Fatura adresiyle aynı","en":"Same as billing address","es":"Igual que la dirección de facturación","de":"Wie Rechnungsadresse","ru":"Совпадает с адресом для счёта"},
   "Delivery address": {"tr":"Teslimat adresi","en":"Delivery address","es":"Dirección de entrega","de":"Lieferadresse","ru":"Адрес доставки"},
