@@ -1,4 +1,4 @@
-// Uçtan uca test: üç ayrı tarayıcı profili (müşteri / admin / fabrika), ortak depo ns=e2e üzerinden.
+// Uçtan uca test: üç ayrı tarayıcı profili (müşteri / admin), ortak depo ns=e2e üzerinden.
 // Çalıştır: tools/e2e.sh   (her adım ayrı bir Chrome oturumunda koşar; adımlar arası tek bağ ortak depodur)
 (async () => {
   const step = Number(new URLSearchParams(location.search).get("step"));
@@ -104,17 +104,17 @@
       ok(r.stage === 3 && Math.abs(r.paid - total) < 0.02, `depoda: aşama ${r.stage} · ödenen ${r.paid}`);
     }
 
-    if (step === 5) {                       // FABRİKA cihazı — hazırlık
-      await login("fabrika", "fabrika2026");
+    if (step === 5) {                       // ADMIN cihazı — hazırlık (fabrika ekranı kaldırıldı)
+      authLogout(); await tick();
+      $("#auU").value = "fabrika"; $("#auP").value = "fabrika2026"; await authLogin(); await tick(300);
+      ok(!authSession() && /hatalı/.test($("#auErr").textContent), "fabrika hesabıyla giriş artık yok");
+      ok(!document.querySelector('#modeSwitch [data-mode="factory"]') && !document.querySelector('#nav [href*="preparation"]'), "Fabrika görünümü ve menüsü yok");
+      await login("admin", "senso2026");
       const o = orderOf();
-      location.hash = "#/factory/queue"; await tick(400);
-      ok($("#view").innerText.includes(o.no), `fabrika kuyruğunda ${o.no}`);
-      ok(!/\$\d/.test($("#view").innerText), "fabrika ekranında fiyat görünmüyor");
-      location.hash = "#/factory/prep/" + o.no; await tick(400);
-      o.items.forEach(([s, b]) => prepSet(o.no, s, b)); await tick(300);
-      ok(document.body.innerText.includes("Paletleri kontrol edin") || document.body.innerText.includes("Check pallets"), "paletler kontrol edilmeden buton kapalı ve nedenini yazıyor");
-      state.palletCheck[o.no] = state.palletCheck[o.no].map(() => true); rerender(); await tick(300);
-      finishPrep(o.no); await tick(300); await settle();
+      location.hash = "#/admin/order/" + o.no; await tick(400);
+      const btn = [...document.querySelectorAll("#view button")].find((b) => /Hazırlık tamamlandı/.test(b.textContent));
+      ok(!!btn, "sipariş detayında “Hazırlık tamamlandı · Sevke hazır” butonu");
+      btn.click(); await tick(300); await settle();
       const r = (await remote()).orders.find((x) => x.no === o.no);
       ok(r.stage === 4, `hazırlık tamamlandı → depoda aşama ${r.stage} (Sevke Hazır)`);
     }

@@ -1,5 +1,9 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Hazırlık tamamlandı · Sevke hazır": {"tr":"Hazırlık tamamlandı · Sevke hazır","en":"Preparation done · Ready to ship","es":"Preparación lista · Listo para enviar","de":"Vorbereitung fertig · Versandbereit","ru":"Подготовка завершена · Готово к отправке"},
+  "Hazırlık tamamlandı · sipariş sevke hazır": {"tr":"Hazırlık tamamlandı · sipariş sevke hazır","en":"Preparation done · order is ready to ship","es":"Preparación lista · pedido listo para enviar","de":"Vorbereitung fertig · Auftrag versandbereit","ru":"Подготовка завершена · заказ готов к отправке"},
+  "Ödeme tamamlandı · sipariş hazırlığa alındı": {"tr":"Ödeme tamamlandı · sipariş hazırlığa alındı","en":"Payment complete · order moved to preparation","es":"Pago completado · pedido en preparación","de":"Zahlung vollständig · Auftrag in Vorbereitung","ru":"Оплата завершена · заказ передан в подготовку"},
+  "Hazırlık eksik / problem → Satış + Operasyon": {"tr":"Hazırlık eksik / problem → Satış + Operasyon","en":"Preparation shortage / problem → Sales + Operations","es":"Faltante / problema en preparación → Ventas + Operaciones","de":"Fehlmenge / Problem bei Vorbereitung → Vertrieb + Operations","ru":"Недостача / проблема при подготовке → Продажи + Операции"},
   "Tüm markalar": {"tr":"Tüm markalar","en":"All brands","es":"Todas las marcas","de":"Alle Marken","ru":"Все бренды"},
   "Tüm kategoriler": {"tr":"Tüm kategoriler","en":"All categories","es":"Todas las categorías","de":"Alle Kategorien","ru":"Все категории"},
   "Çıkış yap": {"tr":"Çıkış yap","en":"Sign out","es":"Cerrar sesión","de":"Abmelden","ru":"Выйти"},

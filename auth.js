@@ -1,20 +1,19 @@
 // Giriş / üye ol — demo: hesaplar tarayıcıda tutulur (gerçek sistemde sunucuda doğrulanacak).
-// Rol: admin → tüm panel (görünümler arası geçiş), customer → sadece müşteri portalı, factory → sadece fabrika.
+// Rol: admin → tüm panel (görünümler arası geçiş), customer → sadece müşteri portalı.
 
 const ACCOUNTS = [
   { u: "admin", p: "senso2026", role: "admin", name: "Volkan Koçkan", title: "Super Admin" },
   { u: "ferhat", p: "senso2026", role: "admin", name: "Ferhat Şahin", title: "İhracat Bölge Müdürü", dash: "sales" },
   { u: "gozde", p: "senso2026", role: "admin", name: "Gözde", title: "Export Manager / Final Approver", dash: "approve" },
   { u: "abc", p: "abc2026", role: "customer", cust: "C-1021", name: "John Smith", title: "ABC Distribution GmbH" },
-  { u: "fabrika", p: "fabrika2026", role: "factory", name: "Düzce Fabrika", title: "Fabrika · Hazırlık" },
 ];
 const AUTH_KEY = "mbSession", REGS_KEY = "mbRegs";
-const HOME = { admin: "admin/dashboard", customer: "customer/dashboard", factory: "factory/queue" };
+const HOME = { admin: "admin/dashboard", customer: "customer/dashboard" };
 let authView = "login";
 
 const authGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const authSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-const authSession = () => authGet(AUTH_KEY, null);
+const authSession = () => { const s = authGet(AUTH_KEY, null); return s && HOME[s.role] ? s : null; };   // kaldırılmış rol (fabrika) oturumu geçersiz
 const authRegs = () => STORE.regs;   // başvurular ortak depoda (şifreler SHA-256 özetiyle)
 const authHash = async (u, p) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(u + ":" + p)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 

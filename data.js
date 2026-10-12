@@ -78,7 +78,6 @@ const USERS = [
   { name: "Gözde", email: "gozde@marmarabarber.com", role: "Export Manager / Final Approver", scope: "Tümü" },
   { name: "Ferhat", email: "ferhat@marmarabarber.com", role: "Export Sales", scope: "Kendi müşterileri" },
   { name: "Operasyon Ekibi", email: "ops@marmarabarber.com", role: "Operations", scope: "Tümü" },
-  { name: "Düzce Fabrika", email: "fabrika@marmarabarber.com", role: "Factory", scope: "Sadece hazırlık" },
   { name: "Finans", email: "finans@marmarabarber.com", role: "Finance", scope: "Tümü" },
   { name: "Regülasyon", email: "regulatory@marmarabarber.com", role: "Regulatory", scope: "Dokümanlar" },
 ];

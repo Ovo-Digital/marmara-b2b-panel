@@ -215,7 +215,6 @@ const state = {
 const USERS_BY_MODE = {
   admin: ["VK", "Volkan Koçkan", "Super Admin"],
   customer: ["JS", "John Smith", "ABC Distribution GmbH"],
-  factory: ["DF", "Düzce Fabrika", "Factory · Hazırlık"],
 };
 
 const NAV = {
@@ -231,7 +230,6 @@ const NAV = {
     ["Ürün & Lojistik"],
     ["products", "Ürünler", "box"],
     ["loading", "Palet", "container"],
-    ["preparation", "Fabrika", "factory", 1],
     ["shipments", "Sevkiyat", "truck"],
     ["Finans & Rapor"],
     ["finance", "Finans", "wallet"],
@@ -255,19 +253,14 @@ const NAV = {
     ["Settings"],
     ["account", "Account", "user"],
   ],
-  factory: [
-    ["Fabrika"],
-    ["queue", "Kuyruk", "factory", 2],
-    ["prep", "Hazırlık", "box"],
-  ],
 };
 
 // ——— yönlendirme ———
 function go(path) { location.hash = "#/" + path; }
 function parse() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
-  const mode = ["admin", "customer", "factory"].includes(parts[0]) ? parts[0] : "admin";
-  const page = parts[1] || (mode === "factory" ? "queue" : "dashboard");
+  const mode = ["admin", "customer"].includes(parts[0]) ? parts[0] : "admin";
+  const page = parts[1] || "dashboard";
   return { mode, page, arg: parts[2] };
 }
 
@@ -281,7 +274,7 @@ function render() {
   if (sess && sess.role === mode) { name = sess.name; role = sess.title; ini = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(); }
   $("#modeSwitch").style.display = sess?.role === "admin" ? "" : "none";
   $("#avatar").textContent = ini; $("#meName").textContent = name; $("#meRole").textContent = role;
-  $("#sideTag").textContent = mode === "customer" ? "B2B CUSTOMER PORTAL" : mode === "factory" ? "FACTORY · DÜZCE" : "B2B BACK OFFICE";
+  $("#sideTag").textContent = mode === "customer" ? "B2B CUSTOMER PORTAL" : "B2B BACK OFFICE";
   $("#notifBtn").style.display = mode === "admin" ? "" : "none";
 
   const activeKey = { customer: "customers", order: "orders", application: "customers", product: "products", checkout: "products" }[page] || page;
@@ -293,7 +286,7 @@ function render() {
   }).join("");
   $("#nav .nav-item.on")?.scrollIntoView({ block: "nearest" });
 
-  const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode];
+  const views = { admin: ADMIN, customer: CUST }[mode];
   const fn = views[page] || views[Object.keys(views)[0]];
   $("#view").innerHTML = fn(arg);
   prodFilter();
@@ -301,7 +294,7 @@ function render() {
   $("#app").classList.remove("nav-open");
   window.scrollTo(0, 0);
 }
-function rerender() { if (!authSession()) return; const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST, factory: FACT }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); prodFilter(); window.scrollTo(0, y); storeQueue(); }
+function rerender() { if (!authSession()) return; const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); prodFilter(); window.scrollTo(0, y); storeQueue(); }
 
 // ——— modal & toast ———
 function modal(html) { $("#modalBox").innerHTML = html; $("#modal").classList.add("on"); }
@@ -452,13 +445,13 @@ document.addEventListener("click", (e) => { if (!e.target.closest("#rangeBox")) 
 
 const DASH_ROLES = {
   mgmt: { label: "Yönetim", kpis: [["$428,650", "Bu ay satış", "trend", "+9.6%"], ["31", "Sipariş", "cart"], ["$386,200", "Tahsilat", "wallet"], ["$510,000", "Ekim forecast", "trend"]],
-    acts: [["err", "cart", "Onay bekleyen sipariş", 2, "admin/orders"], ["warn", "clock", "Süresi dolan rezervasyon", 1, "admin/products/res"], ["err", "factory", "Hazırlık problemi", 2, "admin/preparation"], ["warn", "trend", "Eksik forecast", 3, "admin/forecast"], ["warn", "file", "Süresi dolan doküman", 1, "admin/documents"]] },
+    acts: [["err", "cart", "Onay bekleyen sipariş", 2, "admin/orders"], ["warn", "clock", "Süresi dolan rezervasyon", 1, "admin/products/res"], ["err", "box", "Hazırlık problemi", 2, "admin/orders"], ["warn", "trend", "Eksik forecast", 3, "admin/forecast"], ["warn", "file", "Süresi dolan doküman", 1, "admin/documents"]] },
   sales: { label: "Satış · Ferhat", kpis: [["$214,300", "Benim satışım", "trend", "+6.1%"], ["18", "Müşterilerim", "users"], ["2", "İncelememde", "cart"], ["$142,000", "Ekim forecast", "trend"]],
     acts: [["err", "cart", "Satış incelemesi bekleyen", 1, "admin/order/SO-2026-0148"], ["gold", "users", "Yeni başvuru", 2, "admin/customers"], ["warn", "trend", "Forecast girmeyen müşterim", 3, "admin/forecast"], ["plain", "clock", "60 gündür sipariş vermeyen", 1, "admin/customer/C-1002"]] },
   approve: { label: "Onay · Gözde", kpis: [["2", "Final onay bekleyen", "shield"], ["2", "Onay bekleyen başvuru", "users"], ["1", "Rezervasyon doluyor", "clock"], ["$428,650", "Bu ay satış", "trend", "+9.6%"]],
     acts: [["err", "shield", "Final onay bekliyor", 2, "admin/order/SO-2026-0147"], ["warn", "clock", "Rezervasyon doluyor", 1, "admin/products/res"], ["gold", "users", "Müşteri başvurusu", 2, "admin/customers"], ["warn", "tag", "Fiyat değişikliği onayı", 1, "admin/pricing"]] },
-  ops: { label: "Operasyon", kpis: [["7", "Hazırlanıyor", "factory"], ["3", "Sevke hazır", "truck"], ["2", "Hazırlık problemi", "alert"], ["4", "Bu hafta pickup", "calendar"]],
-    acts: [["err", "factory", "Hazırlık problemi", 2, "admin/preparation"], ["ok", "truck", "Final packing bekliyor", 1, "admin/shipments"], ["warn", "alert", "Düşük stok SKU", 2, "admin/products"], ["info", "container", "Eksik yükleme planı", 1, "admin/loading"]] },
+  ops: { label: "Operasyon", kpis: [["7", "Hazırlanıyor", "box"], ["3", "Sevke hazır", "truck"], ["2", "Hazırlık problemi", "alert"], ["4", "Bu hafta pickup", "calendar"]],
+    acts: [["err", "box", "Hazırlık problemi", 2, "admin/orders"], ["ok", "truck", "Final packing bekliyor", 1, "admin/shipments"], ["warn", "alert", "Düşük stok SKU", 2, "admin/products"], ["info", "container", "Eksik yükleme planı", 1, "admin/loading"]] },
   fin: { label: "Finans", kpis: [["$17,590", "Açık bakiye", "wallet"], ["$386,200", "Eylül tahsilat", "check"], ["5", "Ödeme bekleyen", "clock"], ["$1,250", "Customer credit", "bank"]],
     acts: [["warn", "wallet", "Ödeme bekleyen proforma", 5, "admin/finance"], ["info", "wallet", "Kısmi ödeme", 1, "admin/finance"], ["gold", "bank", "Dağıtılmamış ödeme", 1, "admin/finance"]] },
 };
@@ -518,8 +511,8 @@ ADMIN.notifications = () => {
     ["err", "cart", "SO-2026-0148 satış incelemesi bekliyor", "ABC Distribution · $52,818 · 20' DC · Sorumlu: Ferhat", "admin/order/SO-2026-0148", "İncele"],
     ["err", "shield", "SO-2026-0147 final onay bekliyor", "Barber Supply Co. · 40' HC · Onaylayan: Gözde", "admin/order/SO-2026-0147", "Onayla"],
     ["warn", "clock", "Rezervasyon bugün doluyor — SO-2026-0145", "Otomatik release yok. Extend veya Release seçilmeli.", "admin/products/res", "Karar ver"],
-    ["err", "factory", "Hazırlık problemi — SO-2026-0145", "BC-400-2: 103 koli gerekli, 101 bulundu (2 eksik)", "factory/prep/SO-2026-0145", "Aç"],
-    ["err", "factory", "Hazırlık gecikmesi — SO-2026-0141", "BHS-750-M ve BM-007058 henüz hazırlanmadı", "factory/prep/SO-2026-0141", "Aç"],
+    ["err", "box", "Hazırlık problemi — SO-2026-0145", "BC-400-2: 103 koli gerekli, 101 bulundu (2 eksik)", "admin/order/SO-2026-0145", "Aç"],
+    ["err", "box", "Hazırlık gecikmesi — SO-2026-0141", "BHS-750-M ve BM-007058 henüz hazırlanmadı", "admin/order/SO-2026-0141", "Aç"],
     ["warn", "trend", "3 müşteri Ekim forecast girmedi", "Baltic Grooming, Riyadh Grooming, Kazakh Style", "admin/forecast", "Hatırlat"],
     ["warn", "file", "Free Sales Certificate 14 Ekim'de doluyor", "Tüm müşterilere görünür doküman", "admin/documents", "Güncelle"],
     ["gold", "users", "2 yeni B2B başvurusu", "Nordic Cuts AB (SE), Maison du Barbier (FR)", "admin/customers", "İncele"],
@@ -530,7 +523,7 @@ ADMIN.notifications = () => {
     ${items.map(([t, i, a, b, href, cta]) => `<li onclick="go('${href}')"><span class="act-ic" style="background:var(--${t === "gold" ? "accent" : t}-bg);color:var(--${t === "gold" ? "accent" : t})">${ic(i)}</span><span class="act-t"><b style="display:block;color:var(--text)">${a}</b><small class="muted">${b}</small></span><button class="btn sm">${cta}</button></li>`).join("")}
   </ul></div>
   <div class="card flat"><div class="card-h"><h3>Bildirim Kuralları</h3></div>
-    ${["Yeni sipariş → Satış sorumlusu (mail + panel)", "Final onay → Export Manager", "Rezervasyon 3 gün / 1 gün / doldu → Satış + Final onaylayan", "Ödeme alındı / bekliyor → Finans + Satış", "Fabrika eksik / problem → Satış + Operasyon", "Forecast eksik → Müşteri (mail) + Satış", "Düşük stok → Operasyon", "Doküman süresi doluyor → Regülasyon", "Müşteri 60 gün pasif → Satış"].map((r) => `<div class="stat-row"><span style="color:var(--text)">${r}</span></div>`).join("")}
+    ${["Yeni sipariş → Satış sorumlusu (mail + panel)", "Final onay → Export Manager", "Rezervasyon 3 gün / 1 gün / doldu → Satış + Final onaylayan", "Ödeme alındı / bekliyor → Finans + Satış", "Hazırlık eksik / problem → Satış + Operasyon", "Forecast eksik → Müşteri (mail) + Satış", "Düşük stok → Operasyon", "Doküman süresi doluyor → Regülasyon", "Müşteri 60 gün pasif → Satış"].map((r) => `<div class="stat-row"><span style="color:var(--text)">${r}</span></div>`).join("")}
     
   </div></div>`;
 };
@@ -633,11 +626,12 @@ ADMIN.order = (no) => {
     <div class="stat-row"><span>Proforma</span><b>PI-${no.slice(3)} / Rev.1</b></div><div class="stat-row"><span>Alınan</span><b>${money(o.paid, o.currency)}</b></div><div class="stat-row"><span>Bakiye</span><b class="warn-t">${money(total - o.paid, o.currency)}</b></div>
     <button class="btn gold block mt" onclick="go('admin/finance/${no}')">${ic("wallet")} Ödeme Ekle</button>
     <button class="btn danger block mt" onclick="advance('${no}');toast('Ödemesiz serbest bırakıldı — kritik yetki, audit log’a yazıldı','shield')">Ödemesiz Serbest Bırak</button>`;
-  else if (o.stage === 3) action = `<div class="card-h"><h3>Fabrikada</h3><span class="pill info">Hazırlanıyor</span></div>
+  else if (o.stage === 3) action = `<div class="card-h"><h3>Hazırlık</h3><span class="pill info">Hazırlanıyor</span></div>
     ${o.problem ? `<div class="notice err">${ic("alert")}<span><b>Hazırlık problemi:</b> BC-400-2 için 103 koli gerekli, 101 bulundu. Müşteriye otomatik gösterilmez.</span></div>` : ""}
     <div class="stat-row"><span>Rezervasyon bitişi</span><b class="${o.problem ? "err-t" : ""}">${o.reserveUntil}</b></div>
     <div class="row mt"><button class="btn sm" onclick="toast('Rezervasyon 7 gün uzatıldı')">Extend</button><button class="btn sm danger" onclick="toast('Rezervasyon serbest bırakıldı','alert')">Release</button></div>
-    <button class="btn block mt" onclick="go('factory/prep/${no}')">${ic("factory")} Hazırlık ekranını aç</button>`;
+    <button class="btn gold block lg mt" onclick="finishPrep('${no}')">${ic("check")} Hazırlık tamamlandı · Sevke hazır</button>
+    <button class="btn danger block mt" onclick="reportProblem('${no}')">${ic("alert")} Problem Bildir</button>`;
   else if (o.stage === 4) action = `<div class="card-h"><h3>Sevke Hazır</h3><span class="pill ok">Final packing onaylı</span></div><button class="btn gold block lg" onclick="go('admin/shipments/${no}')">${ic("truck")} Sevkiyatı kapat</button>`;
   else action = `<div class="card-h"><h3>Sevk Edildi</h3><span class="pill plain">Tamamlandı</span></div><div class="stat-row"><span>Forwarder</span><b>${o.ship?.fwd || "ABC Logistics"}</b></div><div class="stat-row"><span>Referans</span><b class="mono">${o.ship?.ref || "BK-12345"}</b></div><div class="stat-row"><span>Konteyner</span><b class="mono">${o.ship?.plate || "TCLU 482113-7"}</b></div>`;
 
@@ -889,19 +883,6 @@ function manualAdjust(no) {
   <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="closeModal();log('${no}','Manuel repack yapıldı');toast('Manuel repack kaydedildi · loglandı')">Kaydet</button></div>`);
 }
 
-// ——— Hazırlık (admin görünümü) ———
-ADMIN.preparation = () => `${head("Fabrika / Hazırlık", "", `<button class="btn" onclick="go('factory/queue')">${ic("factory")} Fabrika ekranına geç</button>`)}
-  <div class="card">${prepTable(false)}</div>`;
-function prepTable(factory) {
-  const list = ORDERS.filter((o) => o.stage === 3 || o.stage === 4);
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sipariş</th><th>Müşteri</th><th>Yükleme</th><th class="r">Koli</th><th>Hazırlık</th><th>Hedef Çıkış</th><th>Durum</th></tr></thead><tbody>
-  ${list.map((o) => { const need = orderBoxes(o.items), pr = state.prep[o.no], done = o.stage === 4 ? need : pr ? Object.values(pr).reduce((a, b) => a + b, 0) : 0, pct = Math.round((done / need) * 100);
-    return `<tr class="click" onclick="go('factory/prep/${o.no}')"><td class="mono strong">${o.no}</td><td>${C(o.cust).flag} ${factory ? C(o.cust).country : C(o.cust).name}</td><td>${targetLabel(o.target)} · ${loadCalc(o.items, o.target).pallets.length} palet</td><td class="r">${num(need)}</td>
-    <td style="min-width:160px"><div class="between"><small>${done}/${need}</small><small>${pct}%</small></div><div class="bar ${pct === 100 ? "ok" : ""}" style="height:6px;margin-top:4px"><i style="width:${pct}%"></i></div></td><td class="muted">${o.stage === 4 ? "28 Sep 2026" : "03 Oct 2026"}</td>
-    <td>${o.stage === 4 ? '<span class="pill ok">Tamamlandı</span>' : o.problem ? '<span class="pill err">Problem</span>' : '<span class="pill info">Hazırlanıyor</span>'}</td></tr>`; }).join("")}
-  </tbody></table></div>`;
-}
-
 // ——— Sevkiyat ———
 ADMIN.shipments = (arg) => {
   const ready = ORDERS.filter((x) => x.stage === 4);
@@ -988,9 +969,9 @@ function addPayment(no) {
   if (amt <= 0) { toast("Geçerli bir tutar girin", "alert"); return; }
   o.paid = Math.round((o.paid + amt) * 100) / 100;
   const full = o.paid + 0.01 >= orderTotal(o);
-  log(no, `Ödeme eklendi: ${money(amt, o.currency, 2)} · toplam alınan ${money(o.paid, o.currency, 2)}${full && o.stage === 2 ? " · fabrika kuyruğuna gönderildi" : ""}`);
+  log(no, `Ödeme eklendi: ${money(amt, o.currency, 2)} · toplam alınan ${money(o.paid, o.currency, 2)}${full && o.stage === 2 ? " · hazırlığa alındı" : ""}`);
   if (full && o.stage === 2) o.stage = 3;
-  toast(full ? "Ödeme tamamlandı · sipariş fabrika kuyruğuna düştü" : "Kısmi ödeme eklendi");
+  toast(full ? "Ödeme tamamlandı · sipariş hazırlığa alındı" : "Kısmi ödeme eklendi");
   rerender();
 }
 function newRevision() { const n = "Rev." + (state.piRevs.length + 1); state.piRevs.push([n, "30 Sep 2026", "Admin revize"]); toast(`${n} oluşturuldu · önceki revizyon saklandı`); rerender(); }
@@ -1238,56 +1219,11 @@ CUST.account = () => { const c = C(ME); return `${head("Account", c.name)}
   <div class="card-h mt"><h3>Users</h3><button class="btn sm">${ic("plus")} Invite</button></div><div class="stat-row"><span style="color:var(--text)">John Smith</span><small class="muted">Admin</small></div><div class="stat-row"><span style="color:var(--text)">Lena Fischer</span><small class="muted">Orders</small></div></div></div>`; };
 
 // ═════════════════════════════ FABRİKA ═════════════════════════════
-const FACT = {};
-FACT.queue = () => `${head("Hazırlık Kuyruğu", "")}<div class="card">${prepTable(true)}</div>`;
-FACT.prep = (no) => {
-  no = no || "SO-2026-0145";
-  const o = O(no), L = loadCalc(o.items, o.target);
-  const pr = (state.prep[no] ||= Object.fromEntries(o.items.map(([s]) => [s, 0])));
-  const allDone = o.items.every(([s, b]) => (pr[s] || 0) >= b);
-  const pc = (state.palletCheck[no] ||= L.pallets.map(() => o.stage === 4));
-  const allChecked = pc.every(Boolean);
-  return `${head(`Sipariş ${no}`, `Hazırlığa bırakıldı · ${C(o.cust).flag} ${C(o.cust).country} · ${targetLabel(o.target)} · ${L.pallets.length} palet`, `${o.stage === 4 ? '<span class="pill ok">TAMAMLANDI</span>' : '<span class="pill warn">HAZIRLANIYOR</span>'}`, `<a href="#/factory/queue">Kuyruk</a> / ${no}`)}
-  <div class="card" style="margin-bottom:18px">${stepper(o.stage === 4 ? 3 : allDone ? 2 : 1, ["Kuyruk", "Koli Hazırlama", "Palet Kontrol", "Tamamlandı"])}</div>
-  ${o.problem ? `<div class="notice err" style="margin-bottom:18px">${ic("alert")}<span><b>Bildirilen problem:</b> BC-400-2 — 103 koli gerekli, 101 bulundu. Satış + Operasyon'a alert düştü, müşteriye otomatik gösterilmez.</span></div>` : ""}
-  <div class="grid g-main"><div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th class="r">Gerekli</th><th class="c">Hazırlanan</th><th class="c">Durum</th></tr></thead><tbody>
-    ${o.items.map(([s, b]) => { const p = P(s), d = pr[s] || 0; return `<tr><td><div class="prod-cell"><div class="thumb" style="width:56px;height:56px">${p.img ? `<img src="${imgSrc(p.img)}">` : noImg(p)}</div><div><b>${p.name}</b><br><small class="mono">${s}</small> <small class="muted">· ${p.cls}</small></div></div></td>
-      <td class="r"><b>${b} koli</b><br><small class="muted">${num(b * p.pcsBox)} pcs</small></td>
-      <td class="c"><div class="qty" style="width:150px;margin:auto"><button onclick="prepSet('${no}','${s}',${d - 1})">−</button><input value="${d}" onchange="prepSet('${no}','${s}',this.value)"><button onclick="prepSet('${no}','${s}',${d + 1})">+</button></div></td>
-      <td class="c">${d >= b ? '<span class="pill ok">✓ Tamam</span>' : d > 0 ? `<span class="pill warn">${b - d} eksik</span>` : '<span class="pill plain">Bekliyor</span>'}</td></tr>`; }).join("")}
-    </tbody></table></div>
-    <div class="between mt wrap"><button class="btn danger" onclick="reportProblem('${no}')">${ic("alert")} Problem Bildir</button>${o.stage === 4 ? `<span class="pill ok">${ic("check")} Hazırlık Tamamlandı</span>` : !allChecked ? `<button class="btn lg" disabled>${ic("layers")} Paletleri kontrol edin (${pc.filter(Boolean).length}/${pc.length})</button>` : allDone ? `<button class="btn ok lg" onclick="finishPrep('${no}')">${ic("check")} Hazırlık Tamamlandı</button>` : `<button class="btn warn lg" onclick="finishShort('${no}')">${ic("alert")} Eksikle Tamamla</button>`}</div></div>
-  <div class="card flat"><div class="card-h"><h3>Palet Planı</h3></div>${palletVisual(L, true)}${skuLegend(o.items)}
-    <div class="divider"></div>${L.pallets.map((p, i) => `<div class="stat-row"><label class="row" style="cursor:pointer"><input type="checkbox" ${pc[i] ? "checked" : ""} ${o.stage === 4 ? "disabled" : ""} onchange="state.palletCheck['${no}'][${i}]=this.checked;rerender()"><span>Palet ${i + 1} · ${[...new Set(p.segs.map((x) => x.sku))].join(", ")}</span></label><b>${p.h} cm · ${num(p.kg)} kg</b></div>`).join("")}
-    </div></div>`;
-};
+// Hazırlık tamamlandı → Sevke Hazır (fabrika ekranı yok; admin sipariş detayından işaretlenir)
 function finishPrep(no) {
-  const o = O(no); o.stage = 4; o.problem = false; o.shipped = { ...state.prep[no] };
-  log(no, "Hazırlık tamamlandı · final packing kontrolüne gönderildi");
-  toast("Hazırlık tamamlandı · Operasyon final packing kontrolüne düştü"); rerender();
-}
-function finishShort(no) {
-  const o = O(no), pr = state.prep[no];
-  const miss = o.items.filter(([s, b]) => (pr[s] || 0) < b);
-  modal(`<h2>Eksikle Tamamla</h2>
-  <div class="tbl-wrap" style="margin:0"><table class="tbl"><thead><tr><th>Ürün</th><th class="r">Gerekli</th><th class="r">Hazırlanan</th><th class="r">Eksik</th></tr></thead><tbody>
-  ${miss.map(([s, b]) => `<tr><td><b>${P(s).name}</b><br><small class="mono">${s}</small></td><td class="r">${b} koli</td><td class="r">${pr[s] || 0} koli</td><td class="r err-t strong">${b - (pr[s] || 0)} koli</td></tr>`).join("")}
-  </tbody></table></div>
-  <div class="field mt"><label>Not</label><textarea class="input" id="shortNote" placeholder="Örn. kalan 2 koli bir sonraki sevkiyata eklenecek"></textarea></div>
-  <div class="notice warn mt">${ic("info")}<span>Satış + Operasyon bilgilendirilir. Packing List ve Commercial Invoice hazırlanan miktarlarla oluşur.</span></div>
-  <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn warn" onclick="confirmShort('${no}')">Eksikle Tamamla</button></div>`);
-}
-function confirmShort(no) {
-  const o = O(no), pr = state.prep[no], note = $("#shortNote")?.value.trim();
-  o.shipped = { ...pr }; o.stage = 4; o.problem = false;
-  const miss = o.items.filter(([s, b]) => (pr[s] || 0) < b).map(([s, b]) => `${s} ${pr[s] || 0}/${b}`).join(", ");
-  log(no, `Hazırlık eksikle tamamlandı: ${miss}${note ? " · Not: " + note : ""}`);
-  closeModal(); toast("Eksikle tamamlandı · Satış + Operasyon bilgilendirildi", "alert"); rerender();
-}
-function prepSet(no, sku, v) {
-  const need = O(no).items.find(([s]) => s === sku)[1];
-  state.prep[no][sku] = Math.max(0, Math.min(need, parseInt(v) || 0));
-  rerender();
+  const o = O(no); o.stage = 4; o.problem = false; o.shipped = Object.fromEntries(o.items);
+  log(no, "Hazırlık tamamlandı · sevke hazır");
+  toast("Hazırlık tamamlandı · sipariş sevke hazır"); rerender();
 }
 function reportProblem(no) {
   const o = O(no);
@@ -1340,8 +1276,8 @@ function srchResults(q) {
   const mode = state.mode, out = [];
   PRODUCTS.filter((p) => srchHit(prodText(p), q)).slice(0, 6).forEach((p) => out.push({ g: "Ürünler", html: `${thumb(p)}<div><b>${p.name}</b><small class="mono">${p.sku} · ${p.cat}</small></div>`, go: mode === "admin" ? `admin/product/${p.sku}` : mode === "customer" ? "customer/products" : null, q: p.sku }));
   if (mode === "admin") CUSTOMERS.filter((c) => srchHit(`${c.name} ${c.country} ${c.city} ${c.id} ${c.contact}`, q)).slice(0, 4).forEach((c) => out.push({ g: "Müşteriler", html: `<span class="srch-ic">${c.flag}</span><div><b>${c.name}</b><small>${c.country} · ${c.id}</small></div>`, go: `admin/${c.status === "Pending" ? "application" : "customer"}/${c.id}` }));
-  ORDERS.filter((o) => (mode !== "customer" || o.cust === ME) && (mode !== "factory" || o.stage >= 3) && srchHit(`${o.no} ${C(o.cust).name} ${o.items.map(([s]) => s).join(" ")}`, q)).slice(0, 4).forEach((o) =>
-    out.push({ g: "Siparişler", html: `<span class="srch-ic">${ic("cart")}</span><div><b class="mono">${o.no}</b><small>${C(o.cust).name} · ${STAGES[o.stage]}</small></div>`, go: mode === "factory" ? `factory/prep/${o.no}` : `${mode}/order/${o.no}` }));
+  ORDERS.filter((o) => (mode !== "customer" || o.cust === ME) && srchHit(`${o.no} ${C(o.cust).name} ${o.items.map(([s]) => s).join(" ")}`, q)).slice(0, 4).forEach((o) =>
+    out.push({ g: "Siparişler", html: `<span class="srch-ic">${ic("cart")}</span><div><b class="mono">${o.no}</b><small>${C(o.cust).name} · ${STAGES[o.stage]}</small></div>`, go: `${mode}/order/${o.no}` }));
   return out.filter((r) => r.go);
 }
 function srchRender() {
@@ -1388,7 +1324,7 @@ srchMount();
 $("#collapse").onclick = () => { $("#app").classList.toggle("mini"); $("#collapse").innerHTML = ic($("#app").classList.contains("mini") ? "chevR" : "chevL"); };
 $("#burger").onclick = () => $("#app").classList.toggle("nav-open");
 $("#notifBtn").onclick = () => go("admin/notifications");
-document.querySelectorAll("#modeSwitch button").forEach((b) => (b.onclick = () => go(b.dataset.mode + "/" + (b.dataset.mode === "factory" ? "queue" : "dashboard"))));
+document.querySelectorAll("#modeSwitch button").forEach((b) => (b.onclick = () => go(b.dataset.mode + "/dashboard")));
 $("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
 window.addEventListener("hashchange", render);
 render();
