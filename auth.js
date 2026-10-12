@@ -1,11 +1,12 @@
-// Giriş / üye ol — demo: hesaplar tarayıcıda tutulur (gerçek sistemde sunucuda doğrulanacak).
+// Giriş / üye ol — şifreler sunucuda (/api/auth) kontrol edilir; başarılı girişte imzalı oturum anahtarı saklanır.
 // Rol: admin → yalnız admin paneli, customer → yalnız müşteri portalı (paneller ayrı).
+// Panele aktarılan müşteri e-postasıyla ilk kez girince yeni şifre belirleme ekranına yönlendirilir.
 
+// Çalışan listesi (yalnız ad/unvan — şifreler bu dosyada yok)
 const ACCOUNTS = [
-  { u: "admin", p: "senso2026", role: "admin", name: "Volkan Koçkan", title: "Super Admin" },
-  { u: "ferhat", p: "senso2026", role: "admin", name: "Ferhat Şahin", title: "İhracat Bölge Müdürü", dash: "sales" },
-  { u: "gozde", p: "senso2026", role: "admin", name: "Gözde", title: "Export Manager / Final Approver", dash: "approve" },
-  { u: "abc", p: "abc2026", role: "customer", cust: "C-1021", name: "John Smith", title: "ABC Distribution GmbH" },
+  { u: "admin", role: "admin", name: "Volkan Koçkan", title: "Super Admin" },
+  { u: "ferhat", role: "admin", name: "Ferhat Şahin", title: "İhracat Bölge Müdürü", dash: "sales" },
+  { u: "gozde", role: "admin", name: "Gözde", title: "Export Manager / Final Approver", dash: "approve" },
 ];
 const AUTH_KEY = "mbSession", REGS_KEY = "mbRegs";
 const HOME = { admin: "admin/dashboard", customer: "customer/dashboard" };
@@ -14,8 +15,27 @@ let authView = "login";
 const authGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const authSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const authSession = () => { const s = authGet(AUTH_KEY, null); return s && HOME[s.role] ? s : null; };   // kaldırılmış rol (fabrika) oturumu geçersiz
-const authRegs = () => STORE.regs;   // başvurular ortak depoda (şifreler SHA-256 özetiyle)
-const authHash = async (u, p) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(u + ":" + p)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+let authPending = null;   // şifre belirleme ekranı için { u, company }
+async function authApi(body) {
+  const r = await fetch(authUrl(), { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status >= 500) throw new Error(j.error || r.status);
+  return { status: r.status, ...j };
+}
+// oturum açıldı: anahtarı sakla, depoyu yükle, kendi paneline git
+async function authStart(r) {
+  authSet(AUTH_KEY, { ...r.session, token: r.token });
+  STORE.ready = storeInit(); await STORE.ready;
+  const s = authSession();
+  state.dashSet = false;
+  if (location.hash.replace(/^#\/?/, "").startsWith(s.role)) render(); else location.hash = "#/" + HOME[s.role];
+}
+function authExpired(status) {
+  try { localStorage.removeItem(AUTH_KEY); } catch {}
+  clearInterval(STORE.poll); STORE.online = false;
+  authView = "login"; render();
+  setTimeout(() => toast(status === 403 ? "Hesabınız pasif durumda" : "Oturum süreniz doldu, tekrar giriş yapın", "alert"), 50);
+}
 
 function authSyncCustomer() {}   // müşteri kaydı artık ortak depoyla eşitleniyor
 
@@ -35,25 +55,28 @@ async function authLogin() {
   state.cart = {}; state.actAs = null;   // her girişte boş sepet
   const u = $("#auU").value.trim().toLocaleLowerCase("tr"), p = $("#auP").value;
   const err = (m) => { $("#auErr").className = "auth-err"; $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
-  await STORE.ready;
-  const acc = ACCOUNTS.find((a) => a.u === u && a.p === p);
-  const h = await authHash(u, p);
-  const reg = authRegs().find((r) => r.u === u && r.h === h);
-  if (!acc && !reg) return err("Kullanıcı adı veya şifre hatalı");
-  if (reg) {
-    const c = C(reg.cust);
-    if (!c) return err("Kullanıcı adı veya şifre hatalı");
-    if (c.status !== "Active") {
-      const box = $("#auErr"); box.className = "auth-err pending"; box.style.display = "flex";
-      box.innerHTML = `${ic("clock")}<span><b>Bilgileriniz doğru.</b> Başvurunuz ekibimiz tarafından inceleniyor; onaylandığında bu bilgilerle giriş yapabilirsiniz.</span>`;
-      return;
-    }
-    authSet(AUTH_KEY, { u, role: "customer", cust: c.id, name: c.contact, title: c.name });
-  } else authSet(AUTH_KEY, { u: acc.u, role: acc.role, cust: acc.cust, name: acc.name, title: acc.title, dash: acc.dash });
-  const s = authSession();
-  state.dashSet = false;
-  if (location.hash.replace(/^#\/?/, "").startsWith(s.role) || s.role === "admin") render(); else location.hash = "#/" + HOME[s.role];
-  if (!location.hash) location.hash = "#/" + HOME[s.role];
+  if (!u) return err("Kullanıcı adı veya şifre hatalı");
+  let r; try { r = await authApi({ action: "login", u, p }); } catch { return err("Bağlantı kurulamadı, lütfen tekrar deneyin"); }
+  if (r.setPassword) { authPending = { u, company: r.company }; authView = "setpw"; return authRender(); }
+  if (r.pending) {
+    const box = $("#auErr"); box.className = "auth-err pending"; box.style.display = "flex";
+    box.innerHTML = `${ic("clock")}<span><b>Bilgileriniz doğru.</b> Başvurunuz ekibimiz tarafından inceleniyor; onaylandığında bu bilgilerle giriş yapabilirsiniz.</span>`;
+    return;
+  }
+  if (r.inactive) return err("Hesabınız pasif durumda. Lütfen satış temsilcinizle iletişime geçin.");
+  if (!r.token) return err("Kullanıcı adı veya şifre hatalı");
+  await authStart(r);
+}
+// panele aktarılmış müşteri: ilk girişte yeni şifre
+async function authSetPw() {
+  const p = $("#spP").value, p2 = $("#spP2").value;
+  const err = (m) => { $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
+  if (p.length < 8) return err("Şifre en az 8 karakter olmalı");
+  if (p !== p2) return err("Şifreler aynı değil");
+  let r; try { r = await authApi({ action: "setPassword", u: authPending.u, p }); } catch { return err("Bağlantı kurulamadı, lütfen tekrar deneyin"); }
+  if (r.status === 409) { authView = "login"; authRender(); return setTimeout(() => toast("Bu hesabın şifresi zaten belirlenmiş — giriş yapın", "info"), 50); }
+  if (!r.token) return err(r.error === "inactive" ? "Hesabınız pasif durumda. Lütfen satış temsilcinizle iletişime geçin." : "Şifre kaydedilemedi");
+  authPending = null; await authStart(r);
 }
 function authLogout() {
   try { localStorage.removeItem(AUTH_KEY); } catch {}
@@ -85,9 +108,6 @@ function authRender() {
       </div>
       <div class="auth-or"><span>Hesabınız yok mu?</span></div>
       <button class="btn block lg" onclick="authView='register';authRender()">Üye ol</button>
-      <details class="auth-demo"><summary>Demo hesaplar</summary>
-        ${ACCOUNTS.map((a) => `<button onclick="authFill('${a.u}','${a.p}')"><b>${a.u}</b><span>${a.title}</span><code class="notranslate">${a.p}</code></button>`).join("")}
-      </details>
     </div>`;
   else if (authView === "register") {
     const f = (l, id, t = "text", req) => `<div class="field"><label>${l}${req ? " *" : ""}</label><input class="input" id="${id}" type="${t}"></div>`;
@@ -120,7 +140,20 @@ function authRender() {
       <div class="auth-err" id="auErr"></div>
       <button class="btn primary block lg mt" onclick="authRegister()">Başvuruyu gönder</button>
     </div>`;
-  } else card = `
+  } else if (authView === "setpw") card = `
+    <div class="auth-card">
+      <h1>Yeni şifre belirleyin</h1>
+      <p class="muted" style="margin:-4px 0 18px;line-height:1.5"><b class="notranslate">${(authPending?.company || "").replace(/</g, "&lt;")}</b> — Hesabınız yeni B2B portalımıza taşındı. Devam etmek için kendinize bir şifre belirleyin.</p>
+      <div class="form">
+        <div class="field"><label>E-posta</label><input class="input notranslate" value="${(authPending?.u || "").replace(/"/g, "&quot;")}" disabled></div>
+        <div class="field"><label>Yeni şifre</label><input class="input" id="spP" type="password" autocomplete="new-password" placeholder="En az 8 karakter"></div>
+        <div class="field"><label>Yeni şifre (tekrar)</label><input class="input" id="spP2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')authSetPw()"></div>
+        <div class="auth-err" id="auErr"></div>
+        <button class="btn primary block lg" onclick="authSetPw()">Şifreyi kaydet ve giriş yap</button>
+        <a class="auth-link" onclick="authView='login';authPending=null;authRender()">${ic("chevL")} Girişe dön</a>
+      </div>
+    </div>`;
+  else card = `
     <div class="auth-card">
       <div class="auth-done">${ic("check")}</div>
       <h1>Başvurunuz alındı</h1>
@@ -129,7 +162,7 @@ function authRender() {
       <button class="btn primary block lg mt" onclick="authView='login';authRender()">Giriş ekranına dön</button>
     </div>`;
   box.innerHTML = `<div class="auth">${brand}<div class="auth-main">${authLangs()}${card}${legalLinks()}</div></div>`;
-  setTimeout(() => $("#auU")?.focus(), 30);
+  setTimeout(() => ($("#auU") || $("#spP"))?.focus(), 30);
 }
 
 function authWeb(yes) {
@@ -146,15 +179,13 @@ async function authRegister() {
   const hasWeb = $("#rgWebY").classList.contains("on");
   if (hasWeb && !/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/.test(v("rgWeb"))) return err("Geçerli bir web sitesi adresi girin");
   const email = v("rgEmail").toLocaleLowerCase("tr");
-  await STORE.ready;
-  if (authRegs().some((r) => r.u === email) || ACCOUNTS.some((a) => a.u === email)) return err("Bu e-posta ile zaten bir başvuru var");
   const country = v("rgCountry");
   const flags = { Germany: "🇩🇪", France: "🇫🇷", Sweden: "🇸🇪", USA: "🇺🇸", UAE: "🇦🇪", "Saudi Arabia": "🇸🇦", Lithuania: "🇱🇹", Romania: "🇷🇴" };
-  const cust = { id: "A-" + Date.now().toString(36).toUpperCase(), name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", address: v("rgAddr"), shipAddress: ship, type: v("rgType"), sales: "", level: 1, currency: "USD", payment: "", incoterm: "", status: "Pending", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
-    contact: v("rgContact"), email, vat: v("rgVat"), brands: [...document.querySelectorAll(".rgBrand:checked")].map((b) => b.value).join(" / "), applied: fmtDate(new Date()), phone: v("rgPhone") || "—", position: v("rgPos") || "—", website: hasWeb ? v("rgWeb") : "Yok", instagram: v("rgIg").replace(/^@?/, v("rgIg") ? "@" : "") || "—",
+  const cust = { name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", address: v("rgAddr"), shipAddress: ship, type: v("rgType"), sales: "", currency: "USD", payment: "", incoterm: "", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
+    contact: v("rgContact"), vat: v("rgVat"), brands: [...document.querySelectorAll(".rgBrand:checked")].map((b) => b.value).join(" / "), applied: fmtDate(new Date()), phone: v("rgPhone") || "—", position: v("rgPos") || "—", website: hasWeb ? v("rgWeb") : "Yok", instagram: v("rgIg").replace(/^@?/, v("rgIg") ? "@" : "") || "—",
     consents: { version: LEGAL_VERSION, kvkk: new Date().toISOString(), terms: new Date().toISOString(), marketing: $("#cMkt").checked ? new Date().toISOString() : null } };
-  CUSTOMERS.push(cust);
-  STORE.regs.push({ u: email, h: await authHash(email, v("rgPw")), cust: cust.id, at: new Date().toISOString() });
-  await storeSync();
+  let r; try { r = await authApi({ action: "register", u: email, p: v("rgPw"), cust }); } catch { return err("Bağlantı kurulamadı, lütfen tekrar deneyin"); }
+  if (r.status === 409) return err("Bu e-posta ile zaten bir başvuru var");
+  if (!r.ok) return err("Başvuru gönderilemedi");
   authView = "done"; authRender();
 }

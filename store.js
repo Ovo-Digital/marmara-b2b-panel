@@ -1,9 +1,10 @@
 // Ortak depo istemcisi: panel verisini /api/store ile tüm cihazlar arasında eşitler.
-// Açılışta depodan yükler (boşsa demo veriyle tohumlar), her ekran çiziminden sonra değişen kayıtları gönderir,
-// 15 sn'de bir yeni sürüm var mı bakar. Depo yoksa (çevrimdışı) panel yerel veriyle çalışmaya devam eder.
+// Depo yalnız giriş yapmış kullanıcıya açık (oturum anahtarı her isteğe eklenir); müşteri yalnız kendi verisini alır.
+// Girişten sonra depodan yükler (boşsa admin demo veriyle tohumlar), değişen kayıtları gönderir, 15 sn'de bir yeni sürüme bakar.
 
 const STORE = {
-  api: (/vercel\.app$/.test(location.hostname) ? "" : "https://marmara-b2b-panel.vercel.app/") + "api/store",
+  // canlıda ve yerel test sunucusunda göreli adres; dosyadan açılınca canlı servis
+  api: (/vercel\.app$|^localhost$|^127\.0\.0\.1$/.test(location.hostname) ? "" : "https://marmara-b2b-panel.vercel.app/") + "api/store",
   ns: (() => { const q = new URLSearchParams(location.search).get("ns"); if (q != null) { try { localStorage.setItem("mbStoreNs", q); } catch {} return q; } try { return localStorage.getItem("mbStoreNs") || ""; } catch { return ""; } })(),
   rev: 0, snap: null, regs: [], online: false, busy: false, timer: null, poll: null,
 };
@@ -17,7 +18,10 @@ const prodDiff = (p) => {
   for (const k of Object.keys(p)) if (JSON.stringify(p[k]) !== JSON.stringify(b[k])) d[k] = p[k];
   return d;
 };
-const storeUrl = () => STORE.api + (STORE.ns ? `?ns=${encodeURIComponent(STORE.ns)}` : "");
+const nsQ = () => (STORE.ns ? `?ns=${encodeURIComponent(STORE.ns)}` : "");
+const storeUrl = () => STORE.api + nsQ();
+const authUrl = () => STORE.api.replace(/store$/, "auth") + nsQ();
+const storeToken = () => (typeof authSession === "function" && authSession()?.token) || "";
 
 function storeSnapshot() {
   const s = { orders: {}, customers: {}, regs: {}, products: {}, logs: {}, prep: {}, palletCheck: {}, meta: {} };
@@ -34,7 +38,6 @@ function storeChanges() {
   for (const o of ORDERS) if (now.orders[o.no] !== STORE.snap.orders[o.no]) put("orders", o);
   for (const no of Object.keys(STORE.snap.orders)) if (!(no in now.orders)) put("orders", { no, _deleted: true });   // silinen sipariş
   for (const c of CUSTOMERS) if (now.customers[c.id] !== STORE.snap.customers[c.id]) put("customers", c);
-  for (const r of STORE.regs) if (now.regs[r.u] !== STORE.snap.regs[r.u]) put("regs", r);
   for (const p of PRODUCTS) if (now.products[p.sku] !== STORE.snap.products[p.sku]) put("products", prodDiff(p));
   for (const m of ["logs", "prep", "palletCheck", "meta"]) for (const [k, v] of Object.entries(now[m])) if (v !== STORE.snap[m][k]) (ch[m] ||= {})[k] = state[m][k];
   return Object.keys(ch).length ? ch : null;
@@ -50,18 +53,21 @@ function storeApply(doc) {
   STORE.rev = doc.rev; STORE.snap = storeSnapshot();
 }
 async function storeFetch(opts) {
-  const r = await fetch(storeUrl(), { cache: "no-store", ...opts, headers: { "Content-Type": "application/json" } });
+  const r = await fetch(storeUrl(), { cache: "no-store", ...opts, headers: { "Content-Type": "application/json", Authorization: "Bearer " + storeToken() } });
   const j = await r.json().catch(() => ({}));
+  if (r.status === 401 || r.status === 403) { STORE.online = false; if (typeof authExpired === "function") authExpired(r.status); throw new Error("auth"); }
   if (!r.ok) throw new Error(j.error || r.status);
   return j;
 }
 
 // Açılış: depo boşsa mevcut (demo) veriyi tohum olarak yazar
 async function storeInit() {
+  clearInterval(STORE.poll);
+  if (!storeToken()) { STORE.online = false; STORE.snap = storeSnapshot(); return; }   // giriş yapılmadan depo okunmaz
   try {
     const doc = await storeFetch();
     STORE.online = true;
-    if (doc.rev > 0) storeApply(doc);
+    if (doc.rev > 0 || authSession()?.role !== "admin") storeApply(doc);
     else { STORE.snap = { orders: {}, customers: {}, regs: {}, products: storeSnapshot().products, logs: {}, prep: {}, palletCheck: {}, meta: {} }; await storeSync(true); }
   } catch (e) {
     STORE.online = false; STORE.snap = storeSnapshot();
@@ -93,7 +99,7 @@ async function storeSync(force) {
 
 // Yeni sürüm varsa ekranı güncelle (kullanıcı yazı yazarken / pencere açıkken bekler)
 async function storePoll() {
-  if (STORE.busy || storeChanges()) return;
+  if (!storeToken() || STORE.busy || storeChanges()) return;
   try {
     const doc = await storeFetch();
     STORE.online = true;

@@ -552,7 +552,7 @@ const custInfoDl = (c) => {
   const ig = (x) => (x && x !== "—" ? `<a href="https://instagram.com/${pfEsc(x.replace(/^@/, ""))}" target="_blank" rel="noopener">${pfEsc(x)}</a>` : v(x));
   const rows = [["Firma", v(c.name)], ["Firma tipi", v(c.type)], ["Ülke / Şehir", `${c.flag || ""} ${v(c.country)} · ${v(c.city)}`], ["Fatura adresi", v(c.address)], ["Teslimat adresi", v(c.shipAddress || c.address)], ["VAT / Vergi no", `<span class="mono">${v(c.vat)}</span>`],
     ["Yetkili kişi", v(c.contact)], ["Pozisyon", v(c.position)], ["E-posta", c.email ? `<a href="mailto:${pfEsc(c.email)}">${pfEsc(c.email)}</a>` : v("")], ["Telefon / WhatsApp", v(c.phone)],
-    ["Web sitesi", link(c.website)], ["Instagram", ig(c.instagram)], ["İlgilendiği markalar", v(c.brands)], ["Başvuru tarihi", v(c.applied)],
+    ["Web sitesi", link(c.website)], ["Instagram", ig(c.instagram)], ["İlgilendiği markalar", v(c.brands)], ["Başvuru tarihi", v(c.applied)], ["Portal girişi", c.imported ? (c.pwSet ? `Şifre belirlendi · ${fmtDate(new Date(c.pwSet))}` : `<span class="warn-t">Henüz giriş yapmadı</span> <small class="muted">(ilk girişte e-postasıyla şifre belirleyecek)</small>`) + (c.account ? ` <small class="muted">· ${pfEsc(c.account)}</small>` : "") : "Üyelik başvurusuyla"],
     ["Yasal onaylar", c.consents ? `KVKK ✓ · Koşullar ✓ · Pazarlama ${c.consents.marketing ? "✓" : "✗"} <small class="muted">(v${c.consents.version})</small>` : v("")], ["Son güncelleme", v(c.updated)]];
   return `<dl class="dl info-dl">${rows.map(([k, x]) => `<dt>${k}</dt><dd class="notranslate">${x}</dd>`).join("")}</dl>`;
 };
