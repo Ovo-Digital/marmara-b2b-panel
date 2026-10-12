@@ -81,3 +81,13 @@ const USERS = [
   { name: "Finans", email: "finans@marmarabarber.com", role: "Finance", scope: "Tümü" },
   { name: "Regülasyon", email: "regulatory@marmarabarber.com", role: "Regulatory", scope: "Dokümanlar" },
 ];
+
+// Müşteri › İletişim sayfası — [köşeli parantezli] alanlar firmadan gelecek bilgiyle doldurulacak
+const CONTACT = {
+  company: "Senso Cosmetics",
+  email: "[İLETİŞİM E-POSTASI]",
+  phone: "[TELEFON]",
+  address: "[AÇIK ADRES], Düzce / Türkiye",
+  hours: "Mon–Fri 09:00–18:00 (GMT+3)",
+  reps: { Ferhat: { email: "ferhat@marmarabarber.com" } },
+};

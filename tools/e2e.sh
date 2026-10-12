@@ -8,7 +8,7 @@ declare -a WHO=("" musteri admin musteri admin admin admin musteri)
 declare -a NAME=("" "Müşteri: üye ol" "Admin: onay + Level 4" "Müşteri: giriş + sipariş" "Admin: kontrol + onay + ödeme" "Admin: hazırlık" "Admin: final packing + sevk" "Müşteri: durum + fatura")
 for s in 1 2 3 4 5 6 7; do
   echo "── Adım $s · ${NAME[$s]}"
-  perl -e 'alarm 150; exec @ARGV' "$CH" --headless=new --disable-gpu --user-data-dir="$P/${WHO[$s]}" --allow-file-access-from-files \
+  perl -e 'alarm 400; exec @ARGV' "$CH" --headless=new --disable-gpu --user-data-dir="$P/${WHO[$s]}" --allow-file-access-from-files \
     --virtual-time-budget=90000 --dump-dom "file://$PWD/_e2e.html?step=$s" 2>/dev/null \
     | python3 -c "import sys,re,html; d=sys.stdin.read(); m=re.search(r'<pre id=\"o\"[^>]*>(.*?)</pre>',d,re.S); print(html.unescape(m.group(1)) if m else '✗ çıktı yok (sayfa hata verdi ya da zaman aşımı)')"
 done

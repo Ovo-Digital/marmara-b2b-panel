@@ -7,13 +7,16 @@ const STORE = {
   ns: (() => { const q = new URLSearchParams(location.search).get("ns"); if (q != null) { try { localStorage.setItem("mbStoreNs", q); } catch {} return q; } try { return localStorage.getItem("mbStoreNs") || ""; } catch { return ""; } })(),
   rev: 0, snap: null, regs: [], online: false, busy: false, timer: null, poll: null,
 };
+// Katalog (catalog.js) ürünlerinin ilk hâli: depodaki ürün düzenlemeleri bunun üzerine uygulanır
+const PRODUCTS_BASE = JSON.stringify(PRODUCTS);
 const storeUrl = () => STORE.api + (STORE.ns ? `?ns=${encodeURIComponent(STORE.ns)}` : "");
 
 function storeSnapshot() {
-  const s = { orders: {}, customers: {}, regs: {}, logs: {}, prep: {}, palletCheck: {} };
+  const s = { orders: {}, customers: {}, regs: {}, products: {}, logs: {}, prep: {}, palletCheck: {} };
   ORDERS.forEach((o) => (s.orders[o.no] = JSON.stringify(o)));
   CUSTOMERS.forEach((c) => (s.customers[c.id] = JSON.stringify(c)));
   STORE.regs.forEach((r) => (s.regs[r.u] = JSON.stringify(r)));
+  PRODUCTS.forEach((p) => (s.products[p.sku] = JSON.stringify(p)));
   for (const m of ["logs", "prep", "palletCheck"]) for (const [k, v] of Object.entries(state[m] || {})) s[m][k] = JSON.stringify(v);
   return s;
 }
@@ -23,6 +26,7 @@ function storeChanges() {
   for (const o of ORDERS) if (now.orders[o.no] !== STORE.snap.orders[o.no]) put("orders", o);
   for (const c of CUSTOMERS) if (now.customers[c.id] !== STORE.snap.customers[c.id]) put("customers", c);
   for (const r of STORE.regs) if (now.regs[r.u] !== STORE.snap.regs[r.u]) put("regs", r);
+  for (const p of PRODUCTS) if (now.products[p.sku] !== STORE.snap.products[p.sku]) put("products", p);
   for (const m of ["logs", "prep", "palletCheck"]) for (const [k, v] of Object.entries(now[m])) if (v !== STORE.snap[m][k]) (ch[m] ||= {})[k] = state[m][k];
   return Object.keys(ch).length ? ch : null;
 }
@@ -30,6 +34,9 @@ function storeApply(doc) {
   ORDERS.splice(0, ORDERS.length, ...doc.orders);
   CUSTOMERS.splice(0, CUSTOMERS.length, ...doc.customers);
   STORE.regs = doc.regs || [];
+  const prods = JSON.parse(PRODUCTS_BASE);
+  for (const p of doc.products || []) { const i = prods.findIndex((x) => x.sku === p.sku); if (i >= 0) prods[i] = p; else prods.push(p); }
+  PRODUCTS.splice(0, PRODUCTS.length, ...prods);
   state.logs = doc.logs || {}; state.prep = doc.prep || {}; state.palletCheck = doc.palletCheck || {};
   STORE.rev = doc.rev; STORE.snap = storeSnapshot();
 }
@@ -46,7 +53,7 @@ async function storeInit() {
     const doc = await storeFetch();
     STORE.online = true;
     if (doc.rev > 0) storeApply(doc);
-    else { STORE.snap = { orders: {}, customers: {}, regs: {}, logs: {}, prep: {}, palletCheck: {} }; await storeSync(true); }
+    else { STORE.snap = { orders: {}, customers: {}, regs: {}, products: storeSnapshot().products, logs: {}, prep: {}, palletCheck: {} }; await storeSync(true); }
   } catch (e) {
     STORE.online = false; STORE.snap = storeSnapshot();
     console.warn("Ortak depoya ulaşılamadı, yerel veriyle devam:", e.message);

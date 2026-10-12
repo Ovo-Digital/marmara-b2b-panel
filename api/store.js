@@ -1,12 +1,13 @@
 // Ortak veri deposu: siparişler, müşteriler, başvurular, loglar, fabrika hazırlığı.
 // Özel revize reposunda data/store[-<ns>].json olarak tutulur; değişen kayıtlar anahtarlarına göre birleştirilir.
-// GET  /api/store?ns=…           → { rev, orders, customers, regs, logs, prep, palletCheck }
+// GET  /api/store?ns=…           → { rev, orders, customers, regs, products, logs, prep, palletCheck }
+// products: yalnızca panelden eklenen / düzenlenen ürünler (katalogdaki ürünün üzerine yazılır)
 // POST /api/store?ns=…  {changes} → birleştirilmiş güncel belge
 
 const REPO = process.env.REVIZE_REPO || "volkankockan-ovo/marmara-b2b-revizeler";
-const LISTS = { orders: "no", customers: "id", regs: "u" };
+const LISTS = { orders: "no", customers: "id", regs: "u", products: "sku" };
 const MAPS = ["logs", "prep", "palletCheck"];
-const empty = () => ({ rev: 0, updatedAt: null, orders: [], customers: [], regs: [], logs: {}, prep: {}, palletCheck: {} });
+const empty = () => ({ rev: 0, updatedAt: null, orders: [], customers: [], regs: [], products: [], logs: {}, prep: {}, palletCheck: {} });
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");

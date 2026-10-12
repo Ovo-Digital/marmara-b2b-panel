@@ -17,7 +17,7 @@
     if (step === 1) {                       // MÜŞTERİ cihazı — üye ol
       authLogout(); await tick(); authView = "register"; authRender(); await tick();
       const set = (id, v) => ($("#" + id).value = v);
-      set("rgName", CO_NAME); set("rgVat", "DE999888777"); set("rgCity", "Hamburg"); set("rgContact", "Erika Test"); set("rgEmail", EMAIL); set("rgPhone", "+49 40 1234");
+      set("rgName", CO_NAME); set("rgVat", "DE999888777"); set("rgCity", "Hamburg"); set("rgAddr", "Lagerweg 1, 20095 Hamburg"); set("rgContact", "Erika Test"); set("rgEmail", EMAIL); set("rgPhone", "+49 40 1234");
       set("rgIg", "e2ebarber"); authWeb(true); set("rgWeb", "https://e2e-barber.de"); set("rgPw", PW); set("rgPw2", PW);
       await authRegister(); ok(/onay/i.test($("#auErr")?.textContent || "") && !CUSTOMERS.some((c) => c.email === EMAIL), "onay kutuları işaretlenmeden gönderim engellendi: " + ($("#auErr")?.textContent || "—"));
       $("#cKvkk").checked = true; $("#cTerms").checked = true; await authRegister(); await settle();
@@ -48,23 +48,20 @@
       await login(EMAIL, PW);
       ok(location.hash.startsWith("#/customer"), "onay sonrası giriş → müşteri portalı " + location.hash);
       location.hash = "#/customer/products"; await tick(500);
-      const p0 = PRODUCTS.find((p) => stockState(p) !== "out" && p.img);
+      const p0 = PRODUCTS.find((p) => isActive(p) && p.img);
       const shown = document.querySelector(`#pc-${CSS.escape(p0.sku)} .pp b`)?.textContent || "";
       ok(shown.includes(p0.prices[3].toFixed(2)), `kartta Level 4 fiyatı: ${shown.trim()} (Excel L4 = ${p0.prices[3]})`);
       ok(!/Level \d|Middle East|Africa|Yusuf/.test($("#view").innerText), "müşteri ekranında seviye adı yok");
-      state.cart = {}; state.cartTarget = "pallet";
-      const pick = PRODUCTS.filter((p) => stockState(p) !== "out" && !p.loose && p.cls !== "Fragile").slice(0, 3);
-      pick.forEach((p) => (state.cart[p.sku] = Math.min(20, availBoxes(p))));
-      for (let i = 0; i < 6 && !loadCalc(cartItems(), "pallet").complete; i++) { const s = suggestions(cartItems(), "pallet")[0]; if (!s) break; state.cart[s.p.sku] = (state.cart[s.p.sku] || 0) + s.boxes; }
-      const L = loadCalc(cartItems(), "pallet");
-      ok(L.complete, `sepet tam palet: ${L.pallets.length} palet · son palet ${L.last?.h} cm`);
+      state.cart = {};
+      PRODUCTS.filter(isActive).slice(0, 4).forEach((p, i) => (state.cart[p.sku] = [20, 35, 12, 42][i]));
+      ok(!/Pallet|20' Cont/.test($("#cartPanel").innerText), "sepette palet / konteyner yok");
       const expected = cartItems().reduce((s, [sku, b]) => { const p = P(sku); return s + b * p.pcsBox * p.prices[3]; }, 0);
       location.hash = "#/customer/checkout"; await tick(400);
-      $("#ckPo").value = "E2E-PO-1"; $("#ckNote").value = "E2E test notu: lütfen paletleri streçleyin.";
+      ok(!$("#ckPo") && /Lagerweg 1/.test($("#ckAddr").value), "PO alanı yok · teslimat adresi kayıttan geldi"); $("#ckNote").value = "E2E test notu: lütfen paletleri streçleyin.";
       placeOrder(); await tick(500); await settle();
       const ro = (await remote()).orders.find((o) => o.cust === custOf().id);
       ok(!!ro, `depoda sipariş: ${ro?.no} · ${ro?.items.length} kalem · ${ro?.items.reduce((s, [, b]) => s + b, 0)} koli`);
-      ok(ro?.note?.includes("streç") && ro?.po === "E2E-PO-1", "not ve PO depoda");
+      ok(ro?.note?.includes("streç") && ro?.po === "PO-" + ro?.no.slice(3) && /Lagerweg 1/.test(ro?.address), `not, otomatik PO (${ro?.po}) ve adres depoda`);
       out.push(`  beklenen toplam (Excel L4 × koli × adet): $${expected.toFixed(2)}`);
       localStorage.setItem("e2eExpected", String(expected));
       await fetch(storeUrl(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes: { logs: { __e2e: [["", String(expected)]] } } }) });
@@ -79,7 +76,7 @@
       ok(o.currency === "USD" && orderLevel(o) === 4, `para birimi ${o.currency} · sipariş seviyesi Level ${orderLevel(o)}`);
       location.hash = "#/admin/order/" + o.no; await tick(500);
       const t = $("#view").innerText;
-      ok(t.includes("streç") && t.includes("E2E-PO-1"), "sipariş detayında müşteri notu ve PO görünüyor");
+      ok(t.includes("streç") && t.includes(o.po), "sipariş detayında müşteri notu ve PO görünüyor");
       const pi = docHtml(o.no, "pi"), pl = docHtml(o.no, "pl");
       ok(pi.includes(money(total, o.currency, 2)) && pi.includes(CO_NAME), `proforma toplamı ${money(total, o.currency, 2)} ve alıcı doğru`);
       const boxes = o.items.reduce((s, [, b]) => s + b, 0);
@@ -90,10 +87,10 @@
       document.activeElement?.blur(); await storePoll(); await tick(400);
       ok($("#view").innerText.includes("E2E-PO-2"), "başka cihazdaki değişiklik yoklamayla ekrana geldi (PO → E2E-PO-2)");
       const no = o.no;
-      $("#resDate").value = "2026-11-15"; advance(no); await tick(300);
+      advance(no); await tick(300);
       ok(O(no).stage === 1, "Satış incelemesi → Final onaya gönderildi");
       advance(no); await tick(300);
-      ok(O(no).stage === 2 && O(no).reserveUntil === "15 Nov 2026", `Final onay · rezervasyon ${O(no).reserveUntil}`);
+      ok(O(no).stage === 2 && !$("#resDate"), "Final onay verildi (stok rezervasyonu yok) · proforma oluştu");
       location.hash = "#/admin/finance/" + no; await tick(400);
       $("#payAmt").value = String(Math.round(total / 2)); addPayment(no); await tick(300);
       ok(O(no).stage === 2 && payState(O(no))[0] === "Partially Paid", "kısmi ödeme → durum Kısmi Ödendi, fabrikaya gitmedi");
@@ -119,16 +116,16 @@
       ok(r.stage === 4, `hazırlık tamamlandı → depoda aşama ${r.stage} (Sevke Hazır)`);
     }
 
-    if (step === 6) {                       // ADMIN cihazı — final packing + sevk
+    if (step === 6) {                       // ADMIN cihazı — final packing + sevk (sevkiyat bilgisi formu yok)
       await login("admin", "senso2026");
       const o = orderOf();
       location.hash = "#/admin/shipments/" + o.no; await tick(400);
+      ok(!/Sevkiyat Bilgileri/.test($("#view").innerText), "sevkiyat bilgileri formu yok");
       O(o.no).packed = true; log(o.no, "Final packing onaylandı"); rerender(); await tick(300);
-      $("#shFwd").value = "E2E Lojistik"; $("#shRef").value = "BK-E2E-1"; $("#shPlate").value = "TCLU 000000-0";
       markShipped(o.no); await tick(400); await settle();
-      const r = (await remote()).orders.find((x) => x.no === o.no);
-      ok(r.stage === 5 && r.ship?.ref === "BK-E2E-1", `sevk edildi → depoda aşama ${r.stage} · ${r.ship?.fwd} · ${r.ship?.ref}`);
-      ok((await remote()).logs[o.no]?.length >= 6, `aktivite log: ${(await remote()).logs[o.no]?.length} kayıt`);
+      const d = await remote(), r = d.orders.find((x) => x.no === o.no);
+      ok(r.stage === 5 && !!r.ship?.date, `sevk edildi → depoda aşama ${r.stage} · ${r.ship?.date}`);
+      ok(d.logs[o.no]?.length >= 6, `aktivite log: ${d.logs[o.no]?.length} kayıt`);
     }
 
     if (step === 7) {                       // MÜŞTERİ cihazı — durum ve dokümanlar
