@@ -852,9 +852,9 @@ function plData(no) {
   const D = docData(no), { o, c } = D;
   const seller = `SELLER : ${COMPANY.legal}\nTEL:  ${COMPANY.phone}   FAX: ${COMPANY.fax}\nWEB: ${COMPANY.plWeb}\nE-MAIL: ${COMPANY.plEmail}\nHEAD OFFICE: ${COMPANY.address}`;
   const buyer = `BUYER : ${c.name}${c.contact ? " " + c.contact : ""}\n${c.country || ""}\n${D.addr}\n${c.country || ""}`;
-  const head = ["Product ID", "Part Number", "UPC", "Name", "Box", "Quantity", "Net Kg", "Gross Kg", "Gtip Code"];
+  const head = ["Product ID", "Part Number", "UPC", "Name", "Box", "Quantity", "Net Kg", "Gtip Code"];
   const r2 = (v) => Math.round(v * 100) / 100;
-  const rows = D.rows.map((r, i) => [i + 1, r.sku, r.p.ean || "", r.p.name.toUpperCase(), r.q, r.pcs, r2(r.net), r2(r.gross), r.p.gtip || String(r.p.hs || "").replace(/\D/g, "")]);
+  const rows = D.rows.map((r, i) => [i + 1, r.sku, r.p.ean || "", r.p.name.toUpperCase(), r.q, r.pcs, r2(r.net), r.p.gtip || String(r.p.hs || "").replace(/\D/g, "")]);
   const tot = { m3: r2(D.sum("cbm")), boxes: D.sum("q"), qty: D.sum("pcs"), net: r2(D.sum("net")), gross: r2(D.sum("gross")) };
   return { D, o, seller, buyer, head, rows, tot, invNo: poOf(o), invDate: dmy(o.ship?.date || new Date()), pallets: o.pallets };
 }
@@ -872,28 +872,28 @@ function plHtml(no) {
     <pre>${pfEsc(X.buyer).replace(/^BUYER :/, "<b>BUYER :</b>")}</pre>
     <div class="inv"><b>INVOICE NO:</b> ${pfEsc(X.invNo)}<br><b>INVOICE DATE:</b> ${X.invDate}</div>
     <table><thead><tr>${X.head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>
-    ${X.rows.map((r) => `<tr>${r.map((v, i) => `<td style="text-align:${i === 3 ? "left" : "center"}">${pfEsc(i >= 6 && i <= 7 ? String(v).replace(".", ",") : v)}</td>`).join("")}</tr>`).join("")}
-    <tr><td colspan="9" style="border:0;height:14px"></td></tr>
-    <tr class="tot"><td style="border:0;background:none"></td><td style="border:0;background:none"></td><td>Total m3 ${String(X.tot.m3).replace(".", ",")}</td><td>Total ${X.pallets ?? "—"} Pallets</td><td>${X.tot.boxes}</td><td>${X.tot.qty}</td><td>${String(X.tot.net).replace(".", ",")}</td><td>${String(X.tot.gross).replace(".", ",")}</td><td style="border:0;background:none"></td></tr>
+    ${X.rows.map((r) => `<tr>${r.map((v, i) => `<td style="text-align:${i === 3 ? "left" : "center"}">${pfEsc(i === 6 ? String(v).replace(".", ",") : v)}</td>`).join("")}</tr>`).join("")}
+    <tr><td colspan="8" style="border:0;height:14px"></td></tr>
+    <tr class="tot"><td style="border:0;background:none"></td><td style="border:0;background:none"></td><td>Total m3 ${String(X.tot.m3).replace(".", ",")}</td><td>Total ${X.pallets ?? "—"} Pallets</td><td>${X.tot.boxes}</td><td>${X.tot.qty}</td><td>${String(X.tot.net).replace(".", ",")}</td><td style="border:0;background:none"></td></tr>
     </tbody></table>
   </div></body></html>`;
 }
 async function plDownload(no, fmt) {
   const X = plData(no), file = `PackingList_${X.invNo}`.replace(/[^\w.-]+/g, "_");
-  const top = [Array(9).fill(""), [X.seller, "", "", "", "", "", "", "", ""], [X.buyer, "", "", "", "", "", "", "", ""], ["", "", "", "", "", "", "", `INVOICE NO: ${X.invNo}\nINVOICE DATE:  ${X.invDate}`, ""], X.head];
-  const totRow = ["", "", `Total m3 ${X.tot.m3}`, `Total ${X.pallets ?? "?"} Pallets`, X.tot.boxes, X.tot.qty, X.tot.net, X.tot.gross, ""];
+  const top = [Array(8).fill(""), [X.seller, "", "", "", "", "", "", ""], [X.buyer, "", "", "", "", "", "", ""], ["", "", "", "", "", "", `INVOICE NO: ${X.invNo}\nINVOICE DATE:  ${X.invDate}`, ""], X.head];
+  const totRow = ["", "", `Total m3 ${X.tot.m3}`, `Total ${X.pallets ?? "?"} Pallets`, X.tot.boxes, X.tot.qty, X.tot.net, ""];
   if (fmt === "csv") {
     const q = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
     const body = X.rows.map((r) => r.map((v, i) => (i === 2 && v ? "'" + v : v)));
-    const csv = "﻿" + [...top, ...body, Array(9).fill(""), totRow].map((r) => r.map(q).join(",")).join("\r\n");
+    const csv = "﻿" + [...top, ...body, Array(8).fill(""), totRow].map((r) => r.map(q).join(",")).join("\r\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = file + ".csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     return toast("Packing list CSV indirildi", "download");
   }
   try { await loadXlsx(); } catch (e) { return toast(e.message, "alert"); }
-  const aoa = [...top, ...X.rows.map((r) => r.map((v, i) => (i === 2 ? String(v) : v))), Array(9).fill(""), totRow];
+  const aoa = [...top, ...X.rows.map((r) => r.map((v, i) => (i === 2 ? String(v) : v))), Array(8).fill(""), totRow];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } }, { s: { r: 3, c: 7 }, e: { r: 3, c: 8 } }];
-  ws["!cols"] = [{ wch: 11 }, { wch: 15 }, { wch: 16 }, { wch: 44 }, { wch: 7 }, { wch: 10 }, { wch: 9 }, { wch: 10 }, { wch: 15 }];
+  ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } }, { s: { r: 3, c: 6 }, e: { r: 3, c: 7 } }];
+  ws["!cols"] = [{ wch: 11 }, { wch: 15 }, { wch: 16 }, { wch: 44 }, { wch: 7 }, { wch: 10 }, { wch: 9 }, { wch: 15 }];
   ws["!rows"] = [{ hpt: 12 }, { hpt: 80 }, { hpt: 66 }, { hpt: 32 }];
   X.rows.forEach((r, i) => { const ref = XLSX.utils.encode_cell({ r: 5 + i, c: 2 }); if (ws[ref]) { ws[ref].t = "s"; ws[ref].z = "@"; } });
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Packing List");
