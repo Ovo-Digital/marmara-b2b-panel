@@ -947,8 +947,8 @@ function docHtml(no, type) {
   return `<!doctype html><html><head><meta charset=utf-8><title>${title} ${docNo}</title><style>${DOC_CSS}
     @page{size:A4;margin:14mm 14mm 16mm;@bottom-left{content:"${COMPANY.brand}  |  ${title}  ${docNo}";font:8pt Inter,Arial,sans-serif;color:#6b7a86}@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Inter,Arial,sans-serif;color:#6b7a86}}
     @page :not(:first){@top-left{content:"${COMPANY.brand}  ·  ${title}  ·  ${docNo}";font:600 8pt Inter,Arial,sans-serif;color:#1f3644}}
-  </style></head><body><div class="tools"><button onclick="pdfDownload()">Download PDF</button><button onclick="print()">Print</button></div>${pdfScript(docNo, "portrait")}<div class="sheet">
-  <header class="dh"><div class="brand"><img src="${new URL("senso-logo.png", location.href).href}" alt="Senso"><div><b>${COMPANY.brand}</b><span>${COMPANY.legal}</span><span>${COMPANY.address}</span><span>Tax Office / Tax ID: ${phx(COMPANY.tax)}</span></div></div>
+  </style></head><body><div class="tools"><button onclick="pdfDownload()">Download PDF</button><button onclick="print()">Print</button></div>${pdfScript(docNo, "portrait", `${COMPANY.brand}  |  ${title}  ${docNo}`)}<div class="sheet">
+  <header class="dh"><div class="brand"><img src="${new URL("senso-logo-dark.png", location.href).href}" alt="Senso"><div><b>${COMPANY.brand}</b><span>${COMPANY.legal}</span><span>${COMPANY.address}</span><span>Tax Office / Tax ID: ${phx(COMPANY.tax)}</span></div></div>
     <div class="dt"><h1>${title}</h1>${draft ? `<span class="draft">DRAFT — ${isPI ? "pending final approval" : "not yet shipped"}</span>` : ""}</div></header>
   <div class="contact">${COMPANY.phone}  |  ${COMPANY.email}  |  ${COMPANY.web}</div>
   <section class="meta"><div>${kv(meta.slice(0, 4))}</div><div>${kv(meta.slice(4))}</div></section>
@@ -959,41 +959,51 @@ function docHtml(no, type) {
   </tbody></table>
   <div class="closing">
     <div class="tq"><b>TOTAL CARTONS: ${num(D.sum("q"))}</b><b>TOTAL QUANTITY: ${num(D.sum("pcs"))} PCS</b></div>
-    <h4 class="bar">ORDER SUMMARY</h4>
+    <div class="sbar">ORDER SUMMARY</div>
     <div class="sum"><div><span>Subtotal</span><span>${n2(D.subtotal)}</span></div>${(o.adjust || []).length ? o.adjust.map((a) => `<div><span>${a.amount < 0 ? "Discount" : "Additional Charge"}: ${pfEsc(a.label)}</span><span>${a.amount < 0 ? "-" : ""}${n2(Math.abs(a.amount))}</span></div>`).join("") : `<div><span>Additional Charges</span><span>${n2(0)}</span></div>`}<div><span>Tax</span><span>${n2(0)}</span></div>
       <div class="gt"><span>GRAND TOTAL (${cur})</span><span>${n2(D.subtotal + adjTotal(o))}</span></div></div>
-    <h4 class="bar">BANK DETAILS</h4>
+    <div class="sbar">BANK DETAILS</div>
     <div class="bank"><div><span>Beneficiary: ${COMPANY.legal}</span><span>IBAN: ${phx(bank.iban)}</span><span>Account Currency: ${cur}</span></div><div><span>Bank: ${phx(bank.bank)}</span><span>SWIFT / BIC: ${phx(bank.swift)}</span></div></div>
-    <h4 class="bar">PAYMENT, DELIVERY &amp; NOTES</h4>
+    <div class="sbar">PAYMENT, DELIVERY &amp; NOTES</div>
     <div class="notes">${notes.map((x) => `<p>${x}</p>`).join("")}</div>
   </div>
   <footer class="sf"><span>${COMPANY.brand}  |  ${title}  ${docNo}</span></footer>
   </div></body></html>`;
 }
 // Belge penceresinde doğrudan PDF indirme (html2pdf: sayfa A4, satırlar ve kapanış bloğu bölünmez)
-const pdfScript = (file, orient) => `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script><script>
+const pdfScript = (file, orient, foot) => `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script><script>
 function pdfDownload(){const b=document.querySelector(".tools");if(!window.html2pdf){alert("PDF aracı yüklenemedi, internet bağlantısını kontrol edin.");return;}
-b.style.display="none";const el=document.querySelector(".sheet"),st=el.getAttribute("style")||"";el.style.boxShadow="none";el.style.margin="0";
-html2pdf().set({margin:[8,0,10,0],filename:${JSON.stringify(String(file).replace(/[^\w.-]+/g, "_") + ".pdf")},image:{type:"jpeg",quality:0.96},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"${orient}"},pagebreak:{mode:["css","legacy"],avoid:["tr",".closing",".parties",".meta"]}}).from(el).save().then(()=>{el.setAttribute("style",st);b.style.display="";});}
+const el=document.querySelector(".sheet");document.body.classList.add("pdf");b.style.display="none";
+const W=${orient === "landscape" ? 297 : 210};
+html2pdf().set({margin:[7,0,9,0],filename:${JSON.stringify(String(file).replace(/[^\w.-]+/g, "_") + ".pdf")},image:{type:"jpeg",quality:0.97},
+html2canvas:{scale:2.2,useCORS:true,backgroundColor:"#ffffff",scrollX:0,scrollY:0},
+jsPDF:{unit:"mm",format:"a4",orientation:"${orient}"},pagebreak:{mode:["css","legacy"],avoid:["tr",".closing",".parties",".meta",".dh"]}}).from(el).toPdf().get("pdf").then((pdf)=>{
+  const n=pdf.internal.getNumberOfPages(),pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight();
+  for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont("helvetica","normal");pdf.setFontSize(7.5);pdf.setTextColor(107,122,134);
+    pdf.text(${JSON.stringify(foot || "")},14,ph-4);pdf.text("Page "+i+" of "+n,pw-14,ph-4,{align:"right"});
+    if(i>1&&${JSON.stringify(foot || "")}){pdf.setFont("helvetica","bold");pdf.setTextColor(31,54,68);pdf.text(${JSON.stringify((foot || "").replace(/\s+\|\s+/g, "  ·  "))},14,5);}}
+}).save().then(()=>{document.body.classList.remove("pdf");b.style.display="";});}
 <\/script>`;
-const DOC_CSS = `*{box-sizing:border-box}body{margin:0;background:#e9ecef;font:10.5pt/1.45 Inter,"Helvetica Neue",Arial,sans-serif;color:#1f2a33}
+const DOC_CSS = `*{box-sizing:border-box}
+  body.pdf{background:#fff}body.pdf .sheet{width:var(--pw,210mm)!important;min-height:0!important;margin:0!important;box-shadow:none!important;padding:8mm 14mm 6mm!important}
+  body.pdf .meta,body.pdf .parties,body.pdf .bank{grid-template-columns:1fr 1fr!important}body.pdf .ph{background:none}body{margin:0;background:#e9ecef;font:10.5pt/1.45 Inter,"Helvetica Neue",Arial,sans-serif;color:#1f2a33}
   .tools{position:fixed;right:18px;bottom:18px;display:flex;gap:8px;z-index:5}.tools button{padding:10px 16px;border:0;border-radius:8px;background:#1f3644;color:#fff;font:600 13px Inter,Arial,sans-serif;cursor:pointer}
   .sheet{width:210mm;min-height:297mm;margin:24px auto;background:#fff;padding:16mm 14mm 14mm;box-shadow:0 4px 30px rgba(0,0,0,.12)}
-  .dh{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.brand{display:flex;gap:18px;align-items:flex-start}.brand img{width:92px;filter:invert(1)}
+  .dh{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.brand{display:flex;gap:18px;align-items:flex-start}.brand img{width:92px}
   .brand b{display:block;font-size:13pt;letter-spacing:.04em;color:#1f3644;margin:6px 0 4px}.brand span{display:block;font-size:9.5pt;color:#334}
   .dt{text-align:right;white-space:nowrap}.dt h1{margin:4px 0 4px;font-size:17pt;letter-spacing:.04em;color:#1f3644}.draft{display:inline-block;background:#fff3d6;color:#7a5200;border:1px solid #e8c26f;border-radius:99px;padding:2px 10px;font-size:8.5pt;font-weight:700}
   .contact{color:#6b7a86;font-size:9.5pt;padding:8px 0 10px;border-bottom:1px solid #d9dee3}
   .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 40px;padding:14px 0;border-bottom:1px solid #d9dee3}.kv{display:grid;grid-template-columns:120px 1fr;font-size:9.5pt;padding:2px 0}.kv b{color:#1f2a33}
-  .parties{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-top:14px;padding-bottom:12px;border-bottom:1px solid #d9dee3}.parties h4,.bar{margin:0 0 10px;background:#edf1f4;padding:9px 14px;font-size:9.5pt;letter-spacing:.04em;color:#1f3644}
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-top:14px;padding-bottom:12px;border-bottom:1px solid #d9dee3}.parties h4,.sbar{margin:0 0 10px;background:#edf1f4;padding:9px 14px;font-size:9.5pt;line-height:1.3;font-weight:700;letter-spacing:.04em;color:#1f3644}
   .parties b{display:block;font-size:11pt;margin-bottom:2px}.parties span{display:block;font-size:9.5pt}
-  .items{width:100%;border-collapse:collapse;margin-top:14px}.items thead{display:table-header-group}.items th{background:#1f3644;color:#fff;font-size:8.5pt;letter-spacing:.04em;text-align:left;padding:10px 10px}
+  .items{width:100%;border-collapse:collapse;margin-top:14px}.items thead{display:table-header-group}.items th{border:0;background:#1f3644;color:#fff;font-size:8.5pt;letter-spacing:.04em;text-align:left;padding:10px 10px}
   .items td{padding:12px 10px;font-size:9pt;vertical-align:top;border-bottom:1px solid #fff}.items tbody tr:nth-child(odd) td{background:#edf1f4}.items tr{break-inside:avoid}.r{text-align:right!important}
-  .closing{break-inside:avoid}.tq{display:flex;gap:80px;padding:10px 0 14px;font-size:9.5pt}.bar{margin-top:6px}
+  .closing{break-inside:avoid}.tq{display:flex;gap:80px;padding:10px 0 14px;font-size:9.5pt}.sbar{margin-top:6px}
   .sum{width:46%;margin:0 0 14px auto;font-size:9.5pt}.sum div{display:flex;justify-content:space-between;padding:4px 10px}.sum .gt{background:#1f3644;color:#fff;font-weight:700;font-size:11pt;padding:10px 12px;margin-top:6px}
   .bank{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;font-size:9.5pt;margin-bottom:12px}.bank span{display:block}.notes p{margin:0;font-size:9pt}
   .ph{display:inline!important;background:#fff3c4;padding:0 3px;border-radius:3px}.sf{display:none}
   @media print{body{background:#fff}.tools{display:none}.sheet{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}.ph{background:none}}
-  @media (max-width:820px){.sheet{width:auto;margin:0;padding:18px}.meta,.parties,.bank{grid-template-columns:1fr}}`;
+  @media (max-width:820px){body:not(.pdf) .sheet{width:auto;margin:0;padding:18px}body:not(.pdf) .meta,body:not(.pdf) .parties,body:not(.pdf) .bank{grid-template-columns:1fr}}`;
 
 // ——— Packing List: gönderilen şablonun yapısı (satıcı bloğu sabit, alıcı / ürünler siparişten) ———
 function plData(no) {
@@ -1009,13 +1019,13 @@ function plData(no) {
 function plHtml(no) {
   const X = plData(no);
   return `<!doctype html><html><head><meta charset=utf-8><title>Packing List ${X.invNo}</title><style>${DOC_CSS}
-    .pl{font:10.5pt/1.35 Arial,Helvetica,sans-serif;color:#000}.pl img{width:120px;filter:invert(1);display:block;margin:0 0 14px 18px}.pl pre{font:inherit;margin:0 0 18px;white-space:pre-wrap}.pl pre b{font-weight:700}
+    .pl{font:10.5pt/1.35 Arial,Helvetica,sans-serif;color:#000}.pl img{width:120px;display:block;margin:0 0 14px 18px}.pl pre{font:inherit;margin:0 0 18px;white-space:pre-wrap}.pl pre b{font-weight:700}
     .inv{text-align:right;margin:-10px 0 14px}.pl table{width:100%;border-collapse:collapse}.pl th{background:#b7b7b7;border:1px solid #444;padding:6px;font-size:9.5pt}.pl td{border:1px solid #444;padding:4px 6px;font-size:9pt}
     .pl .tot td{background:#b7b7b7;font-weight:700;text-align:center}.pl tr{break-inside:avoid}.pl thead{display:table-header-group}
     @page{size:A4 landscape;margin:12mm;@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Arial;color:#555}}</style></head>
-  <body><div class="tools"><button onclick="(window.opener||window.parent).plDownload('${no}','xlsx')">Download XLSX</button><button onclick="(window.opener||window.parent).plDownload('${no}','csv')">CSV</button><button onclick="pdfDownload()">PDF</button><button onclick="print()">Print</button></div>${pdfScript(`PackingList_${X.invNo}`, "landscape")}
-  <div class="sheet pl" style="width:297mm;min-height:auto">
-    <img src="${new URL("senso-logo.png", location.href).href}" alt="Senso">
+  <body><div class="tools"><button onclick="(window.opener||window.parent).plDownload('${no}','xlsx')">Download XLSX</button><button onclick="(window.opener||window.parent).plDownload('${no}','csv')">CSV</button><button onclick="pdfDownload()">PDF</button><button onclick="print()">Print</button></div>${pdfScript(`PackingList_${X.invNo}`, "landscape", `${COMPANY.brand}  |  PACKING LIST  ${X.invNo}`)}
+  <div class="sheet pl" style="width:297mm;min-height:auto;--pw:297mm">
+    <img src="${new URL("senso-logo-dark.png", location.href).href}" alt="Senso">
     <pre>${pfEsc(X.seller).replace(/^SELLER :/, "<b>SELLER :</b>")}</pre>
     <pre>${pfEsc(X.buyer).replace(/^BUYER :/, "<b>BUYER :</b>")}</pre>
     <div class="inv"><b>INVOICE NO:</b> ${pfEsc(X.invNo)}<br><b>INVOICE DATE:</b> ${X.invDate}</div>
