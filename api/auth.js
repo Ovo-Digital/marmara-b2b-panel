@@ -21,8 +21,10 @@ module.exports = async (req, res) => {
       if (!u) return res.status(400).json({ error: "missing" });
       const h = L.hashPw(u, p);
       const staff = L.STAFF.find((a) => a.u === u && a.h === h);
-      if (staff) return ok({ u, role: staff.role, name: staff.name, title: staff.title, dash: staff.dash });
+      if (staff) return ok({ u, role: staff.role, name: staff.name, title: staff.title, dash: staff.dash, perms: L.PERMS });
       const doc = await L.readDoc(ns);
+      const su = (doc.staff || []).find((x) => x.u === u && x.h === h);   // panelden eklenen kullanıcı
+      if (su) return su.active === false ? res.status(200).json({ inactive: true }) : ok({ u, role: "admin", sid: su.id, name: `${su.first} ${su.last}`.trim(), title: su.title, perms: su.perms || [] });
       const demo = L.DEMO_CUSTOMERS.find((a) => a.u === u && a.h === h);
       const reg = doc.regs.find((r) => r.u === u && r.h === h);
       const cust = demo ? doc.customers.find((c) => c.id === demo.cust) : reg ? doc.customers.find((c) => c.id === reg.cust) : null;

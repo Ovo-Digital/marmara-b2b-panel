@@ -7,11 +7,13 @@ const path = require("path");
 const REPO = process.env.REVIZE_REPO || "volkankockan-ovo/marmara-b2b-revizeler";
 const LISTS = { orders: "no", customers: "id", regs: "u", products: "sku" };
 const MAPS = ["logs", "prep", "palletCheck", "meta"];
-const empty = () => ({ rev: 0, updatedAt: null, orders: [], customers: [], regs: [], products: [], logs: {}, prep: {}, palletCheck: {}, meta: {} });
+const empty = () => ({ rev: 0, updatedAt: null, orders: [], customers: [], regs: [], products: [], staff: [], logs: {}, prep: {}, palletCheck: {}, meta: {} });
+// admin paneli sayfa yetkileri (kullanıcı yönetiminde seçilir)
+const PERMS = ["dashboard", "notifications", "orders", "customers", "pricing", "products", "finance", "reports", "users", "settings"];
 const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
 const hashPw = (u, p) => sha(String(u).toLowerCase() + ":" + p);
 
-// Çalışan hesapları — şifre yok, yalnız SHA-256(kullanıcı:şifre) özeti
+// Yerleşik çalışan hesapları (tam yetki) — şifre yok, yalnız SHA-256(kullanıcı:şifre) özeti. Diğer kullanıcılar depoda (doc.staff).
 const STAFF = [
   { u: "admin", h: "f7909ea880b91b92e4feff9b7bd28bd0c7fec8d0d599e8f206d6bf76d6758635", role: "admin", name: "Volkan Koçkan", title: "Super Admin" },
   { u: "ferhat", h: "a3df8603cbc286258c4700f8b53678a4c80e2c1adf5875e377cbadc8619d245b", role: "admin", name: "Ferhat Şahin", title: "İhracat Bölge Müdürü", dash: "sales" },
@@ -106,4 +108,5 @@ function mergeChanges(doc, ch) {
 }
 const emailKey = (s) => String(s || "").trim().toLowerCase();
 
-module.exports = { STAFF, DEMO_CUSTOMERS, hashPw, signToken, verifyToken, bearer, cors, bodyOf, nsOf, readDoc, updateDoc, mergeChanges, emailKey, empty };
+const randomPassword = () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"; return Array.from(crypto.randomBytes(12), (b) => a[b % a.length]).join(""); };
+module.exports = { PERMS, randomPassword, STAFF, DEMO_CUSTOMERS, hashPw, signToken, verifyToken, bearer, cors, bodyOf, nsOf, readDoc, updateDoc, mergeChanges, emailKey, empty };

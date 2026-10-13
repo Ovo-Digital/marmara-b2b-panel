@@ -10,7 +10,7 @@ function customerView(doc, custId) {
   return { rev: doc.rev, updatedAt: doc.updatedAt, orders, customers: doc.customers.filter((c) => c.id === custId), regs: [], products: doc.products,
     logs: Object.fromEntries(Object.entries(doc.logs).filter(([k]) => nos.has(k))), prep: {}, palletCheck: {}, meta: {} };
 }
-const adminView = (doc) => ({ ...doc, regs: doc.regs.map(({ h, ...r }) => r) });   // şifre özetleri admin'e de gitmez
+const adminView = (doc) => ({ ...doc, regs: doc.regs.map(({ h, ...r }) => r), staff: (doc.staff || []).map(({ h, ...r }) => r) });   // şifre özetleri admin'e de gitmez
 
 module.exports = async (req, res) => {
   L.cors(res);
@@ -19,6 +19,10 @@ module.exports = async (req, res) => {
   if (!who) return res.status(401).json({ error: "auth" });
   const ns = L.nsOf(req), isAdmin = who.role === "admin";
   try {
+    if (isAdmin && who.sid) {   // panelden eklenen kullanıcı pasife alındıysa erişim kesilir
+      const d0 = await L.readDoc(ns), su = (d0.staff || []).find((x) => x.id === who.sid);
+      if (!su || su.active === false) return res.status(403).json({ error: "inactive" });
+    }
     if (req.method === "GET") {
       const doc = await L.readDoc(ns);
       if (!isAdmin) {
@@ -31,7 +35,7 @@ module.exports = async (req, res) => {
     if (req.method !== "POST") return res.status(405).json({ error: "GET / POST" });
     const b = await L.bodyOf(req), ch = b.changes;
     if (!ch || JSON.stringify(ch).length > 2000000) return res.status(400).json({ error: "Geçersiz veri" });
-    delete ch.regs;   // şifre kayıtları yalnız /api/auth üzerinden
+    delete ch.regs; delete ch.staff;   // şifre ve kullanıcı kayıtları yalnız /api/auth ve /api/users üzerinden
     const { doc } = await L.updateDoc(ns, (doc) => {
       if (isAdmin) return L.mergeChanges(doc, ch);
       // müşteri: yalnız kendi siparişleri (yeni ya da mevcut) ve kendi hesabı; silme yok

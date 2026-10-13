@@ -237,6 +237,11 @@ const USERS_BY_MODE = {
   customer: ["JS", "John Smith", "ABC Distribution GmbH"],
 };
 
+// Admin sayfa yetkileri (kullanıcı yönetiminde seçilir) + hazır roller
+const PERMS = [["dashboard", "Gösterge"], ["notifications", "Aksiyonlar"], ["orders", "Siparişler"], ["customers", "Müşteriler"], ["pricing", "Fiyatlandırma"], ["products", "Ürünler"], ["finance", "Finans"], ["reports", "Raporlar"], ["users", "Kullanıcılar & Yetkiler"], ["settings", "Ayarlar"]];
+const ROLE_PRESETS = [["Super Admin", PERMS.map(([k]) => k)], ["Satış", ["dashboard", "notifications", "orders", "customers", "pricing", "products"]], ["Finans", ["dashboard", "orders", "customers", "finance", "reports"]], ["Operasyon", ["dashboard", "notifications", "orders", "products"]], ["Yönetim (izleme)", ["dashboard", "orders", "customers", "reports"]]];
+const PAGE_PERM = { order: "orders", neworder: "orders", checkout: "orders", customer: "customers", application: "customers", product: "products", loading: "orders", shipments: "orders", forecast: "dashboard", documents: "dashboard", marketing: "dashboard" };
+const can = (key) => { const s = authSession(); return !s || s.role !== "admin" || !s.perms || s.perms.includes(key); };
 const NAV = {
   admin: [
     ["Genel"],
@@ -282,6 +287,8 @@ function parse() {
 function render() {
   if (!authGuard()) return;
   const { mode, page, arg } = parse();
+  // yetkisiz sayfa → yetkili ilk sayfaya
+  if (mode === "admin" && !can(PAGE_PERM[page] || page)) { const first = NAV.admin.find((n) => n.length > 1 && can(n[0])); if (first && first[0] !== page) { location.replace("#/admin/" + first[0]); return; } }
   state.mode = mode;
   document.querySelectorAll("#modeSwitch button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
   let [ini, name, role] = USERS_BY_MODE[mode];
@@ -296,7 +303,8 @@ function render() {
   // müşteri bildirimi olan siparişi açtıysa: okundu say (menü rozeti bu çizimde düşsün)
   if (mode === "customer" && page === "order") { const fo = O(arg); state.freshNotice = fo?.custNotice && !fo.custNotice.seen && sess?.role === "customer" ? (fo.custNotice.seen = true, arg) : state.freshNotice === arg ? arg : null; }
   const activeKey = mode === "admin" && ["neworder", "checkout"].includes(page) ? "orders" : { customer: "customers", order: "orders", application: "customers", product: "products", checkout: "products" }[page] || page;
-  $("#nav").innerHTML = NAV[mode].map((n) => {
+  const navItems = NAV[mode].filter((n, i, a) => (n.length === 1 ? a.slice(i + 1).findIndex((x) => x.length === 1) !== 0 && a.slice(i + 1, (a.slice(i + 1).findIndex((x) => x.length === 1) + i + 1) || a.length).some((x) => x.length > 1 && (mode !== "admin" || can(x[0]))) : mode !== "admin" || can(n[0])));
+  $("#nav").innerHTML = navItems.map((n) => {
     if (n.length === 1) return `<div class="nav-group">${n[0]}</div>`;
     const [key, label, icon] = n;
     const badge = mode === "admin" && key === "customers" ? CUSTOMERS.filter((c) => c.status === "Pending").length : mode === "admin" && key === "notifications" ? actionUnread() : mode === "customer" && key === "orders" ? custNotices().length : n[3];
@@ -1461,18 +1469,75 @@ function uploadContent() {
 }
 
 // ——— Kullanıcılar & Ayarlar ———
+// ——— Kullanıcılar & Yetkiler (sunucu: /api/users) ———
+async function usersApi(method, body) {
+  const r = await fetch(STORE.api.replace(/store$/, "users") + nsQ(), { method, cache: "no-store", headers: { "Content-Type": "application/json", Authorization: "Bearer " + storeToken() }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+async function loadUsers() {
+  state.usersLoading = true;
+  try { state.users = (await usersApi("GET")).users; state.usersErr = null; } catch (e) { state.usersErr = e.message; }
+  state.usersLoading = false;
+  if (parse().page === "users") rerender();
+}
+const permLabel = (k) => (PERMS.find((p) => p[0] === k) || [k, k])[1];
 ADMIN.users = () => {
-  const acts = ["Görüntüle", "Oluştur", "Düzenle", "Onayla", "Sil", "Export"];
-  const roles = [["Super Admin", "111111"], ["Export Manager / Final Approver", "111110"], ["Export Sales", "111001"], ["Operations", "101100"], ["Factory", "101000"], ["Finance", "111101"], ["Marketing", "111010"], ["Regulatory", "111010"], ["Management / Viewer", "100001"]];
-  const crit = ["Müşteri onayı", "Fiyat değişikliği", "Final sipariş onayı", "Ödemesiz serbest bırakma", "Final packing", "Sevk edildi işaretleme"];
-  return `${head("Kullanıcılar & Yetkiler", "", `<button class="btn gold">${ic("plus")} Kullanıcı Davet Et</button>`)}
-  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Kullanıcı</th><th>E-posta</th><th>Rol</th><th>Kapsam</th><th>Son giriş</th></tr></thead><tbody>
-  ${USERS.map((u, i) => `<tr><td class="strong">${u.name}</td><td class="muted">${u.email}</td><td><span class="pill ${u.role === "Super Admin" ? "gold" : "plain"}">${u.role}</span></td><td class="muted">${u.scope}</td><td class="muted">${["Şimdi", "12 dk önce", "1 sa önce", "Bugün", "Bugün", "Dün", "3 gün önce"][i]}</td></tr>`).join("")}
+  if (!state.users && !state.usersLoading && !state.usersErr) loadUsers();
+  const list = state.users || [];
+  const rows = list.map((u) => {
+    const all = u.perms.length === PERMS.length;
+    return `<tr class="${u.active === false ? "off" : ""}"><td><b>${pfEsc(`${u.first} ${u.last}`.trim())}</b>${u.builtIn ? ' <span class="pill plain">Yerleşik</span>' : ""}</td><td class="muted notranslate">${pfEsc(u.u)}</td><td>${pfEsc(u.title || "—")}</td>
+      <td>${all ? '<span class="pill gold">Tüm yetkiler</span>' : u.perms.length ? u.perms.map((p) => `<span class="pill plain">${permLabel(p)}</span>`).join(" ") : '<span class="dim">Yetki yok</span>'}</td>
+      <td>${u.active === false ? '<span class="pill err">Pasif</span>' : '<span class="pill ok">Aktif</span>'}</td>
+      <td class="r">${u.builtIn ? '<small class="muted">sistem hesabı</small>' : `<div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm" onclick="userForm('${u.id}')">${ic("edit")} Düzenle</button><button class="btn sm" onclick="userResetPw('${u.id}')">Şifre sıfırla</button><button class="btn sm ${u.active === false ? "" : "danger"}" onclick="userSetActive('${u.id}',${u.active === false})">${u.active === false ? "Aktif et" : "Pasife al"}</button></div>`}</td></tr>`;
+  }).join("");
+  return `${head("Kullanıcılar & Yetkiler", "", `<button class="btn gold" onclick="userForm()">${ic("plus")} Kullanıcı ekle</button>`)}
+  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ad Soyad</th><th>E-posta (giriş)</th><th>Unvan / Görev</th><th>Yetkiler</th><th>Durum</th><th class="r"></th></tr></thead><tbody>
+  ${state.usersErr ? `<tr><td colspan="6"><div class="notice err">${ic("alert")}<span>Kullanıcılar yüklenemedi: ${pfEsc(state.usersErr)}</span></div></td></tr>` : !state.users ? `<tr><td colspan="6" class="muted">Yükleniyor…</td></tr>` : rows}
   </tbody></table></div></div>
-  <div class="grid g-main mt"><div class="card"><div class="card-h"><h3>Yetki Matrisi</h3></div><div class="tbl-wrap"><table class="tbl perm"><thead><tr><th>Rol</th>${acts.map((a) => `<th class="c">${a}</th>`).join("")}</tr></thead><tbody>
-  ${roles.map(([r, m]) => `<tr><td class="strong">${r}</td>${[...m].map((x) => `<td class="c"><span class="${x === "1" ? "y" : "n"}">${x === "1" ? "✓" : "–"}</span></td>`).join("")}</tr>`).join("")}</tbody></table></div></div>
-  <div class="card dark"><div class="card-h"><h3>Kritik Yetkiler</h3></div>${crit.map((c, i) => `<div class="stat-row"><span style="color:var(--text)">${c}</span><b class="gold-t" style="font-size:12px">${["Gözde", "Gözde", "Gözde", "Super Admin", "Gözde", "Operasyon", "Operasyon"][i]}</b></div>`).join("")}</div></div>`;
+  <div class="notice info mt">${ic("info")}<span>Kullanıcı, admin paneline e-posta ve şifresiyle girer; menüde yalnız yetkili olduğu sayfaları görür. Pasife alınan kullanıcı anında erişimini kaybeder. Şifreler yalnız oluşturulurken ve sıfırlanırken bir kez gösterilir.</span></div>`;
 };
+function userForm(id) {
+  const u = id ? (state.users || []).find((x) => x.id === id) : null, has = (k) => (u ? u.perms.includes(k) : false);
+  modal(`<h2>${u ? "Kullanıcıyı düzenle" : "Kullanıcı ekle"}</h2>
+  <div class="form cols2">
+    <div class="field"><label>Ad *</label><input class="input" id="ufFirst" value="${pfEsc(u?.first || "")}"></div>
+    <div class="field"><label>Soyad</label><input class="input" id="ufLast" value="${pfEsc(u?.last || "")}"></div>
+    <div class="field"><label>E-posta (giriş adı) *</label><input class="input notranslate" id="ufEmail" type="email" value="${pfEsc(u?.u || "")}" ${u ? "disabled" : ""}></div>
+    <div class="field"><label>Unvan / Görev</label><input class="input" id="ufTitle" value="${pfEsc(u?.title || "")}" placeholder="Ör. İhracat Satış Uzmanı"></div>
+    <div class="field span2"><label>Rol</label><select class="input" id="ufRole" onchange="userPreset(this.value)"><option value="">Özel (aşağıdan seçin)</option>${ROLE_PRESETS.map(([n], i) => `<option value="${i}">${n}</option>`).join("")}</select></div>
+    <div class="field span2"><label>Yetkiler (görebileceği sayfalar)</label><div class="checks perm-checks">${PERMS.map(([k, l]) => `<label><input type="checkbox" class="ufPerm" value="${k}" ${has(k) ? "checked" : ""}>${l}</label>`).join("")}</div></div>
+    ${u ? "" : `<div class="field span2"><label>Şifre</label><input class="input" id="ufPw" type="text" placeholder="Boş bırakırsanız güçlü bir şifre üretilir (en az 8 karakter)"></div>`}
+  </div>
+  <p class="err-t" id="ufErr" style="font-size:13px"></p>
+  <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="userSave(${u ? `'${u.id}'` : ""})">${u ? "Kaydet" : "Kullanıcıyı oluştur"}</button></div>`);
+}
+function userPreset(i) { if (i === "") return; const p = ROLE_PRESETS[+i][1]; document.querySelectorAll(".ufPerm").forEach((c) => (c.checked = p.includes(c.value))); if (!$("#ufTitle").value) $("#ufTitle").value = ROLE_PRESETS[+i][0]; }
+const pwModal = (title, email, pw) => modal(`<h2>${title}</h2><p class="muted">Bu bilgileri kullanıcıya iletin. Şifre bir daha gösterilmeyecek.</p>
+  <div class="stat-row"><span>Giriş adresi</span><b class="notranslate">${location.origin}</b></div><div class="stat-row"><span>E-posta</span><b class="notranslate">${pfEsc(email)}</b></div>
+  <div class="stat-row"><span>Şifre</span><b class="mono notranslate" id="pwShow">${pfEsc(pw)}</b></div>
+  <div class="m-actions"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('E-posta: ${pfEsc(email)}\\nŞifre: ${pfEsc(pw)}');toast('Kopyalandı','copy')">${ic("copy")} Kopyala</button><button class="btn gold" onclick="closeModal()">Tamam</button></div>`);
+async function userSave(id) {
+  const v = (k) => ($("#" + k)?.value || "").trim(), err = (m) => ($("#ufErr").textContent = m);
+  const user = { first: v("ufFirst"), last: v("ufLast"), email: v("ufEmail"), title: v("ufTitle"), perms: [...document.querySelectorAll(".ufPerm:checked")].map((c) => c.value) };
+  if (!user.first) return err("Ad zorunlu");
+  if (!id && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) return err("Geçerli bir e-posta girin");
+  if (!user.perms.length) return err("En az bir yetki seçin");
+  const pw = v("ufPw"); if (!id && pw && pw.length < 8) return err("Şifre en az 8 karakter olmalı");
+  try {
+    const r = await usersApi("POST", id ? { action: "update", id, user } : { action: "create", user, password: pw || undefined });
+    await loadUsers();
+    if (id) { closeModal(); toast("Kullanıcı güncellendi"); } else pwModal("Kullanıcı oluşturuldu", r.user.u, r.password);
+  } catch (e) { err(e.message); }
+}
+async function userResetPw(id) {
+  const u = (state.users || []).find((x) => x.id === id);
+  modal(`<h2>Şifre sıfırla</h2><p><b>${pfEsc(`${u.first} ${u.last}`)}</b> için yeni şifre üretilecek; eski şifre geçersiz olur.</p><div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="userResetGo('${id}')">Yeni şifre üret</button></div>`);
+}
+async function userResetGo(id) { try { const r = await usersApi("POST", { action: "resetPassword", id }); pwModal("Yeni şifre", r.user.u, r.password); } catch (e) { toast(e.message, "alert"); } }
+async function userSetActive(id, active) { try { await usersApi("POST", { action: "setActive", id, active }); await loadUsers(); toast(active ? "Kullanıcı aktif edildi" : "Kullanıcı pasife alındı · erişimi kapandı", active ? "check" : "x"); } catch (e) { toast(e.message, "alert"); } }
 ADMIN.settings = () => {
   const c20 = SETTINGS.containers["20"], c40 = SETTINGS.containers["40"], pl = SETTINGS.pallet;
   const f = (lbl, path, v, unit) => `<div class="field"><label>${lbl}</label><div class="row"><input class="input" type="number" value="${v}" onchange="setSetting('${path}',this.value)"><span class="muted">${unit}</span></div></div>`;

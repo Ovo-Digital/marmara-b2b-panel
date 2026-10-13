@@ -32,7 +32,7 @@ async function authStart(r) {
 }
 function authExpired(status) {
   try { localStorage.removeItem(AUTH_KEY); } catch {}
-  clearInterval(STORE.poll); STORE.online = false;
+  clearInterval(STORE.poll); STORE.online = false; state.users = null; state.usersErr = null;
   authView = "login"; render();
   setTimeout(() => toast(status === 403 ? "Hesabınız pasif durumda" : "Oturum süreniz doldu, tekrar giriş yapın", "alert"), 50);
 }
