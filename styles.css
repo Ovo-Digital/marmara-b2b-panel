@@ -554,3 +554,23 @@ body.dv-on { overflow: hidden; }
 .la-grid button { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; border: 1px solid #2c2924; background: #171614; color: #f3f0e8; font: 600 16px var(--body, Inter, sans-serif); cursor: pointer; }
 .la-grid button span { font-size: 22px; }
 .la-grid button:hover, .la-grid button.sug { border-color: #c8a46a; background: #1f1c17; }
+
+/* ortak liste filtresi */
+.lf { margin: 0 0 14px; }
+.lf .filters.pf { margin: 0; }
+.lf select.lf-sel.on, .lf-range.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.lf-sort { height: 40px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--panel); padding: 0 12px; }
+.lf-more { height: 40px; position: relative; }
+.lf-more.on { border-color: var(--accent); color: var(--accent-t, #8a6a35); }
+.lf-badge { font-style: normal; background: var(--accent); color: #fff; border-radius: 99px; font-size: 11px; min-width: 18px; height: 18px; display: inline-grid; place-items: center; margin-left: 6px; padding: 0 5px; }
+.lf-clear { height: 40px; }
+.lf-adv { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; padding: 12px; border: 1px dashed var(--line-2); border-radius: 12px; background: var(--panel); }
+.lf-adv select { height: 38px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--card); padding: 0 12px; }
+.lf-range { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); border-radius: 10px; padding: 0 10px; height: 38px; background: var(--card); }
+.lf-range span { font-size: 12.5px; color: var(--muted); margin-right: 4px; white-space: nowrap; }
+.lf-range input { border: 0; background: none; outline: 0; width: 128px; font: inherit; }
+.lf-range input[type=number] { width: 90px; }
+.lf-range em { color: var(--muted); font-style: normal; }
+.lf-sum { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.lf-sum b { color: var(--text); }
+@media (max-width: 760px) { .lf-range { width: 100%; } .lf-range input { flex: 1; width: auto; } }

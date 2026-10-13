@@ -315,12 +315,12 @@ function render() {
   const views = { admin: ADMIN, customer: CUST }[mode];
   const fn = views[page] || views[Object.keys(views)[0]];
   $("#view").innerHTML = fn(arg);
-  prodFilter(); orderFilter(); custFilter();
+  lfApplyAll();
   storeQueue();
   $("#app").classList.remove("nav-open");
   window.scrollTo(0, 0);
 }
-function rerender() { if (!authSession()) return; const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); prodFilter(); orderFilter(); custFilter(); window.scrollTo(0, y); storeQueue(); }
+function rerender() { if (!authSession()) return; const y = window.scrollY; const { mode, page, arg } = parse(); const views = { admin: ADMIN, customer: CUST }[mode]; $("#view").innerHTML = (views[page] || views[Object.keys(views)[0]])(arg); lfApplyAll(); window.scrollTo(0, y); storeQueue(); }
 
 // ——— modal & toast ———
 function modal(html) { $("#modalBox").innerHTML = html; $("#modal").classList.add("on"); }
@@ -524,10 +524,55 @@ function actRow(tone, icon, label, n, href) {
 
 // En yeni sipariş en üstte (oluşturma zamanı, yoksa sipariş no)
 const sortOrders = (list) => list.slice().sort((a, b) => (b.created || "").localeCompare(a.created || "") || b.no.localeCompare(a.no));
+// ——— liste filtre tanımları (filters.js motoru) ———
+const PAY_OPTS = (en) => [["Awaiting", en ? "Awaiting payment" : "Ödeme bekleniyor"], ["Partially Paid", en ? "Partially paid" : "Kısmi ödendi"], ["Paid", en ? "Paid" : "Ödendi"], ["Overpaid", en ? "Overpaid" : "Fazla ödeme"]];
+const uniq = (arr) => [...new Set(arr.filter((x) => x && x !== "—"))].sort((x, y) => String(x).localeCompare(String(y), "tr"));
+const repOpts = () => [["none", "Sorumlusu atanmamış"], ...reps().map((r) => [r.id, pfEsc(r.name)])];
+const ORDER_SORTS = (en) => [["new", en ? "Newest" : "En yeni", "d", -1], ["old", en ? "Oldest" : "En eski", "d", 1], ["amtd", en ? "Amount (high → low)" : "Tutar (yüksek → düşük)", "n", -1, "num"], ["amta", en ? "Amount (low → high)" : "Tutar (düşük → yüksek)", "n", 1, "num"], ...(en ? [] : [["cust", "Müşteri (A–Z)", "sname", 1]]), ["stage", en ? "Status" : "Durum", "stage", 1, "num"]];
+const cfgOrders = () => ({ id: "orders", item: "#view tr[data-lfrow='o']", noun: "sipariş", empty: "#ofEmpty", ph: "Sipariş no, müşteri, PO, ürün adı / SKU ara…", sum: { attr: "n", cur: "cur" },
+  fields: [{ t: "sel", k: "stage", label: "Tüm durumlar", opts: STAGES.map((x, i) => [i, x]) }, { t: "sel", k: "pay", label: "Ödeme: tümü", opts: PAY_OPTS() },
+    { t: "sel", k: "cust", label: "Tüm müşteriler", opts: uniq(ORDERS.map((o) => o.cust)).map(C).filter(Boolean).sort((x, y) => x.name.localeCompare(y.name, "tr")).map((c) => [c.id, pfEsc(c.name)]) },
+    { t: "sel", k: "country", label: "Tüm ülkeler", opts: uniq(ORDERS.map((o) => C(o.cust)?.country)).map((c) => [c, c]), more: 1 },
+    { t: "sel", k: "rep", label: "Tüm sorumlular", opts: repOpts(), more: 1 }, { t: "sel", k: "cur", label: "Para birimi: tümü", opts: [["USD", "USD"], ["EUR", "EUR"]], more: 1 },
+    { t: "sel", k: "src", label: "Kaynak: tümü", opts: [["portal", "Müşteri portalından"], ["admin", "Admin (müşteri adına)"]], more: 1 },
+    { t: "date", k: "d", label: "Sipariş tarihi" }, { t: "num", k: "n", label: "Tutar" }], sorts: ORDER_SORTS() });
+const cfgMyOrders = () => ({ id: "myorders", en: 1, item: "#view tr[data-lfrow='o']", noun: "orders", empty: "#ofEmpty", ph: "Search order no, PO or product…", sum: { attr: "n", cur: "cur" },
+  fields: [{ t: "sel", k: "stage", label: "All statuses", opts: STAGES_EN.map((x, i) => [i, x]) }, { t: "sel", k: "pay", label: "Payment: all", opts: PAY_OPTS(1) },
+    { t: "date", k: "d", label: "Order date" }, { t: "num", k: "n", label: "Amount" }], sorts: ORDER_SORTS(1) });
+const cfgCustomers = () => ({ id: "customers", item: "#view tr[data-lfrow='c']", noun: "müşteri", empty: "#cfEmpty", ph: "Firma, kişi, e-posta, şehir, hesap no ara…", sum: { attr: "n", cur: "cur", label: "açık bakiye" },
+  fields: [{ t: "sel", k: "status", label: "Tüm durumlar", opts: [["Pending", "Onay bekleyen"], ["Active", "Aktif"], ["Inactive", "Pasif"]] },
+    { t: "sel", k: "country", label: "Tüm ülkeler", opts: uniq(CUSTOMERS.map((c) => c.country)).map((c) => [c, c]) },
+    { t: "sel", k: "rep", label: "Tüm sorumlular", opts: repOpts() },
+    { t: "sel", k: "level", label: "Tüm fiyat seviyeleri", opts: LEVELS.map((l) => [l.id, l.name]), more: 1 },
+    { t: "sel", k: "type", label: "Tüm firma tipleri", opts: uniq(CUSTOMERS.map((c) => c.type)).map((x) => [x, x]), more: 1 },
+    { t: "sel", k: "bal", label: "Bakiye: tümü", opts: [["1", "Açık bakiyesi olan"], ["0", "Bakiyesi olmayan"]], more: 1 },
+    { t: "sel", k: "hasord", label: "Sipariş: tümü", opts: [["1", "Sipariş vermiş"], ["0", "Hiç sipariş vermemiş"]], more: 1 },
+    { t: "sel", k: "portal", label: "Portal girişi: tümü", opts: [["set", "Şifresini belirlemiş"], ["wait", "Henüz giriş yapmamış (aktarılan)"], ["reg", "Üyelikle gelen"]], more: 1 },
+    { t: "date", k: "d", label: "Kayıt / başvuru tarihi" }, { t: "num", k: "n", label: "Açık bakiye" }],
+  sorts: [["name", "Ad (A–Z)", "sname", 1], ["namez", "Ad (Z–A)", "sname", -1], ["new", "En yeni kayıt", "d", -1], ["bal", "Açık bakiye (yüksek → düşük)", "n", -1, "num"], ["last", "Son sipariş (yeni → eski)", "slast", -1], ["country", "Ülke", "country", 1]] });
+const cfgProducts = () => ({ id: "products", item: "#view tr[data-lfrow='p']", noun: "ürün", empty: "#pfEmpty", ph: "Ürün adı, SKU, barkod veya kategori ara…",
+  fields: [{ t: "sel", k: "brand", label: "Tüm markalar", opts: uniq(PRODUCTS.map((p) => p.brand)).map((b) => [b, b]) },
+    { t: "sel", k: "cat", label: "Tüm kategoriler", opts: uniq(PRODUCTS.map((p) => p.cat)).map((c) => [c, CAT_TR[c] || c]) },
+    { t: "sel", k: "act", label: "Tüm durumlar", opts: [["on", "Aktif"], ["off", "Pasif"]] },
+    { t: "sel", k: "img", label: "Görsel: tümü", opts: [["1", "Görseli olan"], ["0", "Görseli eksik"]], more: 1 },
+    { t: "sel", k: "gtip", label: "GTİP: tümü", opts: [["1", "GTİP girilmiş"], ["0", "GTİP eksik"]], more: 1 },
+    { t: "num", k: "n", label: "Liste fiyatı" }, { t: "num", k: "box", label: "Koli içi adet" }],
+  sorts: [["cat", "Katalog sırası", "ord", 1, "num"], ["name", "Ad (A–Z)", "sname", 1], ["pa", "Fiyat (düşük → yüksek)", "n", 1, "num"], ["pd", "Fiyat (yüksek → düşük)", "n", -1, "num"], ["sku", "SKU", "ssku", 1]] });
+const cfgCustProducts = () => ({ id: "cproducts", en: 1, item: "#view .pcard[data-lfrow='p']", noun: "products", empty: "#pfEmpty", ph: "Search product name, SKU or barcode…",
+  fields: [{ t: "sel", k: "brand", label: "All brands", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.brand)).map((b) => [b, b]) },
+    { t: "sel", k: "cat", label: "All categories", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.cat)).map((c) => [c, c]) },
+    { t: "sel", k: "incart", label: "Cart: all", opts: [["1", "In my cart"]], more: 1 }, { t: "num", k: "n", label: "Unit price" }],
+  sorts: [["cat", "Catalogue order", "ord", 1, "num"], ["name", "Name (A–Z)", "sname", 1], ["pa", "Price (low → high)", "n", 1, "num"], ["pd", "Price (high → low)", "n", -1, "num"]] });
+const cfgPayments = () => ({ id: "payments", item: "#view tr[data-lfrow='pay']", noun: "proforma", empty: "#payEmpty", ph: "Sipariş no, müşteri veya PI ara…", sum: { attr: "bal", cur: "cur", label: "açık bakiye" },
+  fields: [{ t: "sel", k: "pay", label: "Ödeme: tümü", opts: PAY_OPTS() }, { t: "sel", k: "cust", label: "Tüm müşteriler", opts: uniq(ORDERS.filter((o) => o.stage >= 2).map((o) => o.cust)).map(C).filter(Boolean).map((c) => [c.id, pfEsc(c.name)]) },
+    { t: "sel", k: "cur", label: "Para birimi: tümü", opts: [["USD", "USD"], ["EUR", "EUR"]], more: 1 }, { t: "date", k: "d", label: "Sipariş tarihi" }, { t: "num", k: "n", label: "Tutar" }],
+  sorts: [["bal", "Bakiye (yüksek → düşük)", "bal", -1, "num"], ["new", "En yeni", "d", -1], ["old", "En eski", "d", 1], ["amt", "Tutar (yüksek → düşük)", "n", -1, "num"]] });
+const orderAttrs = (o) => { const c = C(o.cust) || {}, ps = payState(o);
+  return `data-lfrow="o" data-q="${pfEsc(`${o.no} ${c.name || ""} ${c.country || ""} ${o.po || ""} ${o.items.map(([s]) => `${s} ${P(s)?.name || ""}`).join(" ")}`)}" data-stage="${o.stage}" data-pay="${ps[0]}" data-cust="${o.cust}" data-country="${pfEsc(c.country || "")}" data-rep="${repOf(c)?.id || "none"}" data-cur="${o.currency}" data-src="${o.by ? "admin" : "portal"}" data-d="${lfDate(o.created || o.date)}" data-n="${orderTotal(o).toFixed(2)}" data-sname="${pfEsc(c.name || "")}"`; };
 function ordersTable(list, en, del) {
   if (!list.length) return `<div class="empty">Bu filtrede sipariş yok.</div>`;
   return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sipariş</th>${en ? "" : "<th>Ülke</th><th>Müşteri</th>"}<th>Tarih</th>${en ? "" : "<th>Müşteri PO</th>"}<th class="r">Tutar</th><th>${en ? "Payment" : "Ödeme"}</th><th>${en ? "Status" : "Durum"}</th>${del ? "<th></th>" : ""}</tr></thead><tbody>
-  ${sortOrders(list).map((o) => { const c = C(o.cust), ps = payState(o); return `<tr class="click" data-oq="${pfEsc(`${o.no} ${c.name} ${c.country} ${o.po || ""}`)}" data-stage="${o.stage}" data-cust="${o.cust}" onclick="go('${en ? "customer" : "admin"}/order/${o.no}')">
+  ${sortOrders(list).map((o) => { const c = C(o.cust), ps = payState(o); return `<tr class="click" ${orderAttrs(o)} onclick="go('${en ? "customer" : "admin"}/order/${o.no}')">
     <td class="mono strong">${o.no}</td>${en ? "" : `<td>${c.flag || ""} ${c.country || "—"}</td><td>${c.name}</td>`}<td class="muted">${o.date}</td>${en ? "" : `<td class="mono muted">${o.po && o.po !== o.no ? o.po : "—"}</td>`}
     <td class="r strong">${money(orderTotal(o), o.currency)}</td><td><span class="pill ${ps[1]}">${en ? ps[0] : ps[2]}</span></td><td>${stagePill(o.stage, en)}${o.problem && !en ? ` <span class="pill err plain">Problem</span>` : ""}</td>${del ? `<td class="r" onclick="event.stopPropagation()"><button class="btn sm ghost" title="Siparişi sil" onclick="deleteOrder('${o.no}')">${ic("trash")}</button></td>` : ""}</tr>`; }).join("")}
   </tbody></table></div>`;
@@ -612,39 +657,21 @@ ADMIN.customers = () => {
   const countries = [...new Set(CUSTOMERS.map((c) => c.country))].sort();
   const bals = CUSTOMERS.map((c) => [c, custBalance(c.id)]).filter(([, b]) => b > 0.005);
   const byCur = {}; bals.forEach(([c, b]) => (byCur[cur(c)] = (byCur[cur(c)] || 0) + b));
-  const set = (k) => `state.cf.${k}=this.value;custFilter()`;
-  const opt = (v, l, x) => `<option value="${pfEsc(v)}" ${x === v ? "selected" : ""}>${l}</option>`;
   return `${head("Müşteriler", "", "")}
   <div class="grid g4" style="margin-bottom:18px">${kpi(CUSTOMERS.filter((c) => c.status === "Active").length, "Aktif müşteri", "", "users")}${kpi(CUSTOMERS.filter((c) => c.status === "Pending").length, "Onay bekleyen", "", "clock")}${kpi(Object.keys(byCur).length ? Object.entries(byCur).map(([k, v]) => money(v, k)).join(" · ") : money(0), "Toplam açık bakiye", "", "wallet")}${kpi(bals.length, "Bakiyesi olan müşteri", "", "alert")}</div>
   ${bals.length ? `<div class="card" style="margin-bottom:18px"><div class="card-h"><h3>Açık Bakiyeler</h3><span class="sub">Bakiyesi sıfırlanan müşteri bu listeden kalkar</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Müşteri</th><th class="r">Açık bakiye</th><th class="r"></th></tr></thead><tbody>
     ${bals.sort((x, y) => y[1] - x[1]).map(([c, b]) => `<tr><td><a class="strong" href="#/admin/customer/${c.id}">${c.flag || ""} ${pfEsc(c.name)}</a></td><td class="r strong warn-t">${money(b, cur(c), 2)}</td><td class="r"><div class="row" style="justify-content:flex-end"><button class="btn sm gold" onclick="custPayment('${c.id}',1)">Ödeme ekle</button><button class="btn sm" onclick="custPayment('${c.id}',-1)">Ödeme çıkart</button></div></td></tr>`).join("")}
   </tbody></table></div></div>` : ""}
-  <div class="filters pf" id="cf">
-    <div class="search pf-q"><span>${ic("search")}</span><input type="search" value="${pfEsc(f.q)}" placeholder="Firma, kişi, e-posta veya şehir ara…" oninput="${set("q")}"></div>
-    <select onchange="${set("status")}">${opt("all", "Tüm durumlar", f.status)}${opt("Pending", "Onay bekleyen", f.status)}${opt("Active", "Aktif", f.status)}${opt("Inactive", "Pasif", f.status)}</select>
-    <select onchange="${set("country")}">${opt("all", "Tüm ülkeler", f.country)}${countries.map((c) => opt(c, c, f.country)).join("")}</select>
-    <select onchange="${set("level")}">${opt("all", "Tüm seviyeler", f.level)}${LEVELS.map((l) => opt(String(l.id), l.name, f.level)).join("")}</select>
-    <select onchange="${set("bal")}">${opt("all", "Bakiye: tümü", f.bal)}${opt("1", "Bakiyesi olanlar", f.bal)}</select>
-    <select onchange="${set("rep")}">${opt("all", "Tüm sorumlular", f.rep || "all")}${opt("none", "Sorumlusu atanmamış", f.rep)}${reps().map((r) => opt(r.id, pfEsc(r.name), f.rep)).join("")}</select>
-    <span class="pf-n muted" id="cfN"></span>
-  </div>
+  ${lfBar(cfgCustomers())}
   <div class="bulk-bar ${(state.csel || []).length ? "on" : ""}" id="cBulk"><b id="cBulkN">${(state.csel || []).length} müşteri seçili</b>${repSelect("cBulkRep", "", "— Sorumluyu kaldır")}<button class="btn sm gold" onclick="custBulkRep()">Sorumlu ata</button><button class="btn sm ghost" onclick="state.csel=[];rerender()">Seçimi temizle</button></div>
   <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="c" style="width:36px"><input type="checkbox" title="Görünenlerin hepsini seç" onclick="custSelVisible(this.checked)"></th><th>Firma</th><th>Ülke</th><th>Satış Sorumlusu</th><th>Fiyat Seviyesi</th><th class="r">Açık Bakiye</th><th>Son Sipariş</th><th>Durum</th></tr></thead><tbody>
   ${CUSTOMERS.map((c) => { const b = custBalance(c.id), last = sortOrders(ORDERS.filter((o) => o.cust === c.id))[0];
-    return `<tr class="click" data-rep="${repOf(c)?.id || "none"}" data-cq="${pfEsc(`${c.name} ${c.id} ${c.contact || ""} ${c.email || ""} ${c.city || ""} ${c.country}`)}" data-status="${c.status.startsWith("Inactive") ? "Inactive" : c.status}" data-country="${pfEsc(c.country)}" data-level="${c.status === "Pending" ? "" : levelOf(c.id)}" data-bal="${b > 0.005 ? 1 : 0}" onclick="go('admin/${c.status === "Pending" ? "application" : "customer"}/${c.id}')">
+    return `<tr class="click" data-lfrow="c" data-q="${pfEsc(`${c.name} ${c.id} ${c.account || ""} ${c.contact || ""} ${c.email || ""} ${c.city || ""} ${c.country} ${c.phone || ""}`)}" data-status="${c.status.startsWith("Inactive") ? "Inactive" : c.status}" data-country="${pfEsc(c.country)}" data-rep="${repOf(c)?.id || "none"}" data-level="${c.status === "Pending" ? "" : levelOf(c.id)}" data-type="${pfEsc(c.type || "")}" data-bal="${b > 0.005 ? 1 : 0}" data-hasord="${ORDERS.some((o) => o.cust === c.id) ? 1 : 0}" data-portal="${c.imported ? (c.pwSet ? "set" : "wait") : "reg"}" data-d="${lfDate(c.since || c.applied)}" data-n="${b.toFixed(2)}" data-cur="${cur(c)}" data-sname="${pfEsc(c.name)}" data-slast="${last ? lfDate(last.created || last.date) : ""}" onclick="go('admin/${c.status === "Pending" ? "application" : "customer"}/${c.id}')">
     <td class="c" onclick="event.stopPropagation()"><input type="checkbox" class="csel" value="${c.id}" ${(state.csel || []).includes(c.id) ? "checked" : ""} onchange="custSel(this.value,this.checked)"></td><td><b>${c.name}</b><br><small class="dim mono">${c.id}</small></td><td>${c.flag || ""} ${c.country}</td><td>${repOf(c)?.name || c.sales || '<span class="dim">— atanmadı</span>'}</td><td>${c.status === "Pending" ? '<span class="dim">—</span>' : `Level ${levelOf(c.id)}`}</td>
     <td class="r ${b > 0.005 ? "strong warn-t" : "dim"}">${b > 0.005 ? money(b, cur(c), 2) : "—"}</td><td class="muted">${c.status === "Pending" ? "Başvuru: " + (c.applied || "—") : last ? `${last.no} · ${last.date}` : c.lastOrder || "—"}</td>
     <td><span class="pill ${c.status === "Active" ? "ok" : c.status === "Pending" ? "gold" : "err"}">${c.status === "Pending" ? "Onay Bekliyor" : c.status === "Active" ? "Aktif" : "Pasif"}</span></td></tr>`; }).join("")}
   </tbody></table><div class="pf-empty muted" id="cfEmpty" style="display:none">Bu filtrede müşteri yok.</div></div></div>`;
 };
-function custFilter() {
-  if (!$("#cf")) return;
-  const f = state.cf, rows = [...document.querySelectorAll("#view [data-cq]")];
-  let n = 0;
-  rows.forEach((el) => { const d = el.dataset, hit = (f.status === "all" || d.status === f.status) && (f.country === "all" || d.country === f.country) && (f.level === "all" || d.level === f.level) && (f.bal === "all" || d.bal === "1") && (!f.rep || f.rep === "all" || d.rep === f.rep) && (!f.q.trim() || srchHit(d.cq, f.q)); el.style.display = hit ? "" : "none"; n += hit; });
-  $("#cfN").textContent = `${n} / ${rows.length} müşteri`;
-  $("#cfEmpty").style.display = n ? "none" : "";
-}
 
 ADMIN.application = (id) => {
   const c = C(id);
@@ -708,16 +735,8 @@ ADMIN.customer = (id) => {
 
 // ——— Siparişler ———
 ADMIN.orders = () => {
-  const f = state.of;
-  const custs = [...new Set(ORDERS.map((o) => o.cust))].map(C).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
-  const set = (k) => `state.of.${k}=this.value;orderFilter()`;
   return `${head("Siparişler", "", `<button class="btn gold" onclick="newOrderFor()">${ic("plus")} Müşteri adına sipariş</button>`)}
-  <div class="filters pf" id="of">
-    <div class="search pf-q"><span>${ic("search")}</span><input type="search" value="${pfEsc(f.q)}" placeholder="Sipariş no, müşteri veya PO ara…" oninput="${set("q")}"></div>
-    <select onchange="${set("cust")}"><option value="all">Tüm müşteriler</option>${custs.map((c) => `<option value="${c.id}" ${f.cust === c.id ? "selected" : ""}>${c.name}</option>`).join("")}</select>
-    <select onchange="${set("stage")}"><option value="all">Tüm durumlar</option>${STAGES.map((x, i) => `<option value="${i}" ${f.stage === String(i) ? "selected" : ""}>${x} (${ORDERS.filter((o) => o.stage === i).length})</option>`).join("")}</select>
-    <span class="pf-n muted" id="ofN"></span>
-  </div>
+  ${lfBar(cfgOrders())}
   <div class="card">${ordersTable(ORDERS, false, true)}<div class="pf-empty muted" id="ofEmpty" style="display:none">Bu filtrede sipariş yok.</div></div>`;
 };
 function deleteOrder(no) {
@@ -730,14 +749,6 @@ function confirmDeleteOrder(no) {
   const i = ORDERS.findIndex((x) => x.no === no); if (i < 0) return closeModal();
   ORDERS.splice(i, 1); delete state.logs[no];
   closeModal(); toast(`${no} silindi`, "trash"); if (parse().page === "order") go("admin/orders"); else rerender();
-}
-function orderFilter() {
-  if (!$("#of")) return;
-  const f = state.of, rows = [...document.querySelectorAll("#view [data-oq]")];
-  let n = 0;
-  rows.forEach((el) => { const hit = (f.cust === "all" || el.dataset.cust === f.cust) && (f.stage === "all" || el.dataset.stage === f.stage) && (!f.q.trim() || srchHit(el.dataset.oq, f.q)); el.style.display = hit ? "" : "none"; n += hit; });
-  $("#ofN").textContent = `${n} / ${rows.length} sipariş`;
-  $("#ofEmpty").style.display = n ? "none" : "";
 }
 // Admin: müşteri adına sipariş → müşteri seçilerek ürün ekranı açılır
 function newOrderFor(id) { state.actAs = id || null; state.cart = {}; if (id) ME = id; go("admin/neworder"); }
@@ -1103,7 +1114,7 @@ ADMIN.products = () => {
   const act = PRODUCTS.filter(isActive).length, sel = state.psel.filter((x) => P(x));
   return `${head("Ürünler", "", `<button class="btn" onclick="exportProducts()">${ic("download")} Dışa Aktar</button><button class="btn" onclick="bulkImport()">${ic("upload")} Toplu Ürün Aç / Güncelle</button><button class="btn gold" onclick="productForm()">${ic("plus")} Yeni Ürün</button>`)}
   <div class="grid g4">${kpi(act, "Aktif ürün", "", "box")}${kpi(PRODUCTS.length - act, "Pasif ürün", "", "x")}${kpi(new Set(PRODUCTS.map((p) => p.cat)).size, "Kategori", "", "file")}${kpi(PRODUCTS.filter((p) => !p.img).length, "Görseli eksik", "", "image")}</div>
-  <div class="mt">${prodFilterBar("pf")}</div>
+  <div class="mt">${lfBar(cfgProducts())}</div>
   <div class="bulk-bar ${sel.length ? "on" : ""}" id="bulkBar"><b id="bulkN">${sel.length} ürün seçili</b><button class="btn sm danger" onclick="bulkActive(false)">Pasife al</button><button class="btn sm" onclick="bulkActive(true)">Aktif et</button><button class="btn sm ghost" onclick="state.psel=[];rerender()">Seçimi temizle</button></div>
   <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="c" style="width:36px"><input type="checkbox" title="Görünenlerin hepsini seç" onclick="selVisible(this.checked)"></th><th>Ürün</th><th>Marka / Kategori</th><th>Barkod</th><th class="r">Koli içi</th><th class="r">Liste fiyatı</th><th>Durum</th></tr></thead><tbody>
   ${PRODUCTS.map((p) => `<tr class="click ${isActive(p) ? "" : "off"}" ${prodAttrs(p)} onclick="go('admin/product/${encodeURIComponent(p.sku)}')"><td class="c" onclick="event.stopPropagation()"><input type="checkbox" class="psel" value="${pfEsc(p.sku)}" ${sel.includes(p.sku) ? "checked" : ""} onchange="selToggle(this.value,this.checked)"></td><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td><td class="muted">${p.brand}<br><small>${p.cat}</small></td>
@@ -1361,7 +1372,7 @@ function markShipped(no) {
 // ——— Finans ———
 function paymentsTable(list) {
   return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sipariş</th><th>Proforma</th><th class="r">Tutar</th><th class="r">Alınan</th><th class="r">Bakiye</th><th>Durum</th></tr></thead><tbody>
-  ${list.filter((o) => o.stage >= 2).map((o) => { const t = orderTotal(o), ps = payState(o); return `<tr><td class="mono">${o.no}</td><td class="mono muted">PI-${o.no.slice(3)} / Rev.1</td><td class="r">${money(t, o.currency)}</td><td class="r">${money(o.paid, o.currency)}</td><td class="r strong">${money(Math.max(0, t - o.paid), o.currency)}</td><td><span class="pill ${ps[1]}">${ps[2]}</span></td></tr>`; }).join("")}
+  ${list.filter((o) => o.stage >= 2).map((o) => { const t = orderTotal(o), ps = payState(o), cc = C(o.cust) || {}; return `<tr data-lfrow="pay" data-q="${pfEsc(`${o.no} PI-${o.no.slice(3)} ${cc.name || ""} ${o.po || ""}`)}" data-pay="${ps[0]}" data-cust="${o.cust}" data-cur="${o.currency}" data-d="${lfDate(o.created || o.date)}" data-n="${t.toFixed(2)}" data-bal="${Math.max(0, t - o.paid).toFixed(2)}"><td class="mono">${o.no}</td><td class="mono muted">PI-${o.no.slice(3)} / Rev.1</td><td class="r">${money(t, o.currency)}</td><td class="r">${money(o.paid, o.currency)}</td><td class="r strong">${money(Math.max(0, t - o.paid), o.currency)}</td><td><span class="pill ${ps[1]}">${ps[2]}</span></td></tr>`; }).join("")}
   </tbody></table></div>`;
 }
 ADMIN.finance = (arg) => {
@@ -1390,7 +1401,7 @@ ADMIN.finance = (arg) => {
       <div class="stat-row"><span>Customer Credit'e kalan</span><b id="allocRest">€0</b></div>
       <button class="btn ok block lg mt" ${o.stage >= 5 ? "disabled" : ""} onclick="addPayment('${o.no}')">${ic("check")} Ödeme Ekle</button></div>
   </div>
-  <div class="grid g-side mt"><div><div class="card"><div class="card-h"><h3>Ödeme Durumu</h3></div>${paymentsTable(ORDERS)}</div>
+  <div class="grid g-side mt"><div><div class="card"><div class="card-h"><h3>Ödeme Durumu</h3></div>${lfBar(cfgPayments())}${paymentsTable(ORDERS)}<div class="pf-empty muted" id="payEmpty" style="display:none">Bu filtrede proforma yok.</div></div>
   <div class="card mt"><div class="card-h"><h3>Müşteri Cari</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Müşteri</th><th>Döviz</th><th class="r">YTD Fatura</th><th class="r">Açık Bakiye</th><th class="r">Credit</th></tr></thead><tbody>
   ${CUSTOMERS.filter((c) => c.status !== "Pending").map((c) => `<tr><td>${c.flag} ${c.name}</td><td>${c.currency}</td><td class="r">${money(c.ytd, c.currency)}</td><td class="r ${c.balance ? "warn-t strong" : ""}">${money(c.balance, c.currency)}</td><td class="r">${c.id === "C-1017" ? money(1250) : "—"}</td></tr>`).join("")}
   </tbody></table></div></div></div>
@@ -1629,14 +1640,14 @@ CUST.dashboard = () => {
 };
 
 CUST.products = () => `${head("Products / New Order", "")}
-  ${actAsBar()}${prodFilterBar("filter", true)}
+  ${actAsBar()}${lfBar(cfgCustProducts())}
   <div class="grid g-side">
     <div><div class="pgrid">${PRODUCTS.filter(isActive).map(productCard).join("")}</div><div class="pf-empty muted" id="pfEmpty" style="display:none">No products match your search</div></div>
     <div id="cartPanel">${cartPanel()}</div>
   </div>`;
 function productCard(p) {
   const b = state.cart[p.sku] || 0;
-  return `<div class="pcard ${b ? "in" : ""}" id="pc-${p.sku}" ${prodAttrs(p)}>
+  return `<div class="pcard ${b ? "in" : ""}" id="pc-${p.sku}" ${prodAttrs(p, 1)}>
     <div class="ph">${p.img ? `<img src="${imgSrc(p.img)}" alt="" loading="lazy">` : noImg(p)}</div>
     <div class="pb"><div class="pn">${p.name}</div><div class="ps mono">${p.sku} · ${p.brand}</div>
       <div class="pp"><b>${money(custPrice(p), levelCur(levelOf(ME)), 2)}<small> / pcs</small></b><small>${p.pcsBox} pcs / box</small></div>
@@ -1699,7 +1710,7 @@ function placeOrder() {
   else { toast(`Order ${no} submitted · your sales rep has been notified`); go("customer/order/" + no); }
 }
 
-CUST.orders = () => `${head("My Orders", "", `<button class="btn gold" onclick="go('customer/products')">${ic("plus")} New Order</button>`)}<div class="card">${ordersTable(ORDERS.filter((o) => o.cust === ME), true)}</div>`;
+CUST.orders = () => `${head("My Orders", "", `<button class="btn gold" onclick="go('customer/products')">${ic("plus")} New Order</button>`)}${lfBar(cfgMyOrders())}<div class="card">${ordersTable(ORDERS.filter((o) => o.cust === ME), true)}<div class="pf-empty muted" id="ofEmpty" style="display:none">No orders match your filters</div></div>`;
 CUST.order = (no) => {
   const o = O(no), L = orderQty(o.items), ps = payState(o), t = orderTotal(o);
   const fresh = state.freshNotice === no;
@@ -1798,30 +1809,7 @@ const prodText = (p) => `${p.name} ${p.sku} ${p.brand} ${p.cat} ${CAT_TR[p.cat] 
 
 // ——— ürün listelerinde anlık filtre: yazdıkça süzülür, ekran yeniden çizilmez (odak kaybolmaz) ———
 const pfEsc = (t) => String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-const prodAttrs = (p) => `data-pq="${pfEsc(prodText(p))}" data-brand="${pfEsc(p.brand)}" data-cat="${pfEsc(p.cat)}" data-act="${isActive(p) ? "on" : "off"}"`;
-function prodFilterBar(key, en) {
-  const f = state[key], brands = [...new Set(PRODUCTS.map((p) => p.brand))], cats = [...new Set(PRODUCTS.map((p) => p.cat))].sort();
-  const opt = (v, l, cur) => `<option value="${pfEsc(v)}" ${cur === v ? "selected" : ""}>${l}</option>`;
-  const set = (k) => `state.${key}.${k}=this.value;prodFilter()`;
-  return `<div class="filters pf" id="pf" data-key="${key}" data-en="${en ? 1 : ""}">
-    <div class="search pf-q"><span>${ic("search")}</span><input type="search" value="${pfEsc(f.q)}" placeholder="${en ? "Search product name, SKU or barcode…" : "Ürün adı, SKU veya barkod ara…"}" oninput="${set("q")}"></div>
-    <select onchange="${set("brand")}">${opt("all", en ? "All brands" : "Tüm markalar", f.brand)}${brands.map((b) => opt(b, b, f.brand)).join("")}</select>
-    <select onchange="${set("cat")}">${opt("all", en ? "All categories" : "Tüm kategoriler", f.cat)}${cats.map((c) => opt(c, en ? c : CAT_TR[c] || c, f.cat)).join("")}</select>
-    ${en ? "" : `<select onchange="${set("act")}">${opt("all", "Tüm durumlar", f.act || "all")}${opt("on", "Aktif", f.act)}${opt("off", "Pasif", f.act)}</select>`}
-    <span class="pf-n muted" id="pfN"></span>
-  </div>`;
-}
-function prodFilter() {
-  const bar = $("#pf"); if (!bar) return;
-  const f = state[bar.dataset.key], en = !!bar.dataset.en, items = [...document.querySelectorAll("#view [data-pq]")];
-  let n = 0;
-  items.forEach((el) => {
-    const hit = (f.brand === "all" || el.dataset.brand === f.brand) && (f.cat === "all" || el.dataset.cat === f.cat) && (!f.act || f.act === "all" || el.dataset.act === f.act) && (!f.q.trim() || srchHit(el.dataset.pq, f.q));
-    el.style.display = hit ? "" : "none"; n += hit;
-  });
-  $("#pfN").textContent = en ? `${n} / ${items.length} products` : `${n} / ${items.length} ürün`;
-  const empty = $("#pfEmpty"); if (empty) empty.style.display = n ? "none" : "";
-}
+const prodAttrs = (p, cust) => `data-lfrow="p" data-q="${pfEsc(prodText(p))}" data-brand="${pfEsc(p.brand)}" data-cat="${pfEsc(p.cat)}" data-act="${isActive(p) ? "on" : "off"}" data-img="${p.img ? 1 : 0}" data-gtip="${p.gtip ? 1 : 0}" data-n="${(cust ? custPrice(p) : p.prices[0]) ?? ""}" data-box="${p.pcsBox}" data-incart="${state.cart[p.sku] ? 1 : 0}" data-ord="${PRODUCTS.indexOf(p)}" data-sname="${pfEsc(p.name)}" data-ssku="${pfEsc(p.sku)}"`;
 let srchIdx = 0;
 function srchResults(q) {
   const mode = state.mode, out = [];
@@ -1843,7 +1831,7 @@ function srchRender() {
 }
 function srchGo(i) {
   const r = $("#srchBox")._res?.[i]; if (!r) return;
-  if (r.q && r.go === "customer/products") state.filter.q = r.q;
+  if (r.q && r.go === "customer/products") { const k = lfState({ id: "cproducts", fields: [], sorts: [["cat"]] }); k.q = r.q; lfSave("cproducts"); }
   const inp = $(".top .search input"); inp.value = ""; inp.blur(); $("#srchBox").classList.remove("open");
   go(r.go);
 }
