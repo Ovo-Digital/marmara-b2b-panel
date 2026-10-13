@@ -117,7 +117,7 @@ function authRender() {
       <a class="auth-back" onclick="authView='login';authRender()">${ic("chevL")} Giriş</a>
       <h1>B2B hesabı oluşturun</h1>
       <div class="form cols2">
-        ${f("Company name", "rgName", "text", 1)}${s("Country", "rgCountry", ["Germany", "France", "Sweden", "USA", "UAE", "Saudi Arabia", "Lithuania", "Romania"])}
+        ${f("Company name", "rgName", "text", 1)}<div class="field"><label>Country *</label><select class="input" id="rgCountry"><option value="">Select country…</option>${COUNTRIES.map((c) => `<option value="${c.name}">${c.flag} ${c.name}</option>`).join("")}</select></div>
         ${f("City", "rgCity")}${f("Tax / VAT number", "rgVat", "text", 1)}
         <div class="field span2"><label>Billing address *</label><textarea class="input" id="rgAddr" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div>
         <div class="field span2"><label>Delivery address *</label><label class="checks" style="margin:0 0 6px"><label><input type="checkbox" id="rgSame" onchange="$('#rgShip').disabled=this.checked;if(this.checked)$('#rgShip').value=$('#rgAddr').value"> Same as billing address</label></label><textarea class="input" id="rgShip" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div>
@@ -173,15 +173,14 @@ async function authRegister() {
   const v = (id) => $("#" + id).value.trim();
   const err = (m) => { $("#auErr").textContent = m; $("#auErr").style.display = "block"; };
   const ship = $("#rgSame").checked ? v("rgAddr") : v("rgShip");
-  if (!v("rgName") || !v("rgAddr") || !ship || !v("rgVat") || !v("rgContact") || !v("rgEmail") || !v("rgPw")) return err("Please fill all required fields");
+  if (!v("rgName") || !v("rgCountry") || !v("rgAddr") || !ship || !v("rgVat") || !v("rgContact") || !v("rgEmail") || !v("rgPw")) return err("Please fill all required fields");
   if (v("rgPw") !== v("rgPw2")) return err("Passwords do not match");
   if (!$("#cKvkk").checked || !$("#cTerms").checked) return err("Devam etmek için Aydınlatma Metni ve Kullanım Koşulları onayı gerekli");
   const hasWeb = $("#rgWebY").classList.contains("on");
   if (hasWeb && !/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/.test(v("rgWeb"))) return err("Geçerli bir web sitesi adresi girin");
   const email = v("rgEmail").toLocaleLowerCase("tr");
   const country = v("rgCountry");
-  const flags = { Germany: "🇩🇪", France: "🇫🇷", Sweden: "🇸🇪", USA: "🇺🇸", UAE: "🇦🇪", "Saudi Arabia": "🇸🇦", Lithuania: "🇱🇹", Romania: "🇷🇴" };
-  const cust = { name: v("rgName"), country, flag: flags[country], city: v("rgCity") || "—", address: v("rgAddr"), shipAddress: ship, type: v("rgType"), sales: "", currency: "USD", payment: "", incoterm: "", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
+  const cust = { name: v("rgName"), country, flag: countryFlag(country), city: v("rgCity") || "—", address: v("rgAddr"), shipAddress: ship, type: v("rgType"), sales: "", currency: "USD", payment: "", incoterm: "", ytd: 0, lastOrder: "—", balance: 0, forecast: 0,
     contact: v("rgContact"), vat: v("rgVat"), brands: [...document.querySelectorAll(".rgBrand:checked")].map((b) => b.value).join(" / "), applied: fmtDate(new Date()), phone: v("rgPhone") || "—", position: v("rgPos") || "—", website: hasWeb ? v("rgWeb") : "Yok", instagram: v("rgIg").replace(/^@?/, v("rgIg") ? "@" : "") || "—",
     consents: { version: LEGAL_VERSION, kvkk: new Date().toISOString(), terms: new Date().toISOString(), marketing: $("#cMkt").checked ? new Date().toISOString() : null } };
   let r; try { r = await authApi({ action: "register", u: email, p: v("rgPw"), cust }); } catch { return err("Bağlantı kurulamadı, lütfen tekrar deneyin"); }

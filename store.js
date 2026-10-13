@@ -46,6 +46,7 @@ function storeApply(doc) {
   ORDERS.splice(0, ORDERS.length, ...doc.orders);
   CUSTOMERS.splice(0, CUSTOMERS.length, ...doc.customers);
   STORE.regs = doc.regs || [];
+  STORE.staff = doc.staff || [];   // satış sorumlusu seçenekleri için (yalnız admin görünümünde gelir)
   const prods = JSON.parse(PRODUCTS_BASE);
   for (const p of doc.products || []) { const i = prods.findIndex((x) => x.sku === p.sku); const { _new, ...v } = p; if (i >= 0) Object.assign(prods[i], v); else prods.push(v); }
   PRODUCTS.splice(0, PRODUCTS.length, ...prods);
