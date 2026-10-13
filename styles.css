@@ -543,3 +543,14 @@ body.dv-on { overflow: hidden; }
 
 /* kullanıcı yönetimi */
 .perm-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; }
+
+/* ilk ziyaret: dil seçimi */
+.lang-ask { position: fixed; inset: 0; z-index: 500; background: rgba(10, 10, 9, 0.72); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 20px; }
+.la-card { background: #0c0c0b; color: #f3f0e8; border-radius: 22px; padding: 38px 36px 32px; width: min(560px, 100%); text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+.la-card img { width: 120px; display: block; margin: 0 auto 22px; }
+.la-card h2 { font-size: 26px; margin: 0 0 8px; }
+.la-card p { color: #a29d91; font-size: 14px; margin: 0 0 24px; }
+.la-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.la-grid button { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; border: 1px solid #2c2924; background: #171614; color: #f3f0e8; font: 600 16px var(--body, Inter, sans-serif); cursor: pointer; }
+.la-grid button span { font-size: 22px; }
+.la-grid button:hover, .la-grid button.sug { border-color: #c8a46a; background: #1f1c17; }

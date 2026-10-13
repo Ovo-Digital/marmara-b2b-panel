@@ -2,7 +2,8 @@
 // Metin önce anahtara çevrilir: rakamlar, kodlar ve müşteri/ürün/kişi adları "#" olur, çeviride aynı sırayla geri konur.
 
 const LANGS = [["tr", "Türkçe"], ["en", "English"], ["es", "Español"], ["de", "Deutsch"], ["ru", "Русский"]];
-let LANG = (() => { try { return localStorage.getItem("mbLang") || "tr"; } catch { return "tr"; } })();
+const LANG_SAVED = (() => { try { return localStorage.getItem("mbLang"); } catch { return null; } })();   // daha önce dil seçildi mi
+let LANG = LANG_SAVED || "tr";
 
 const I18N_SEP = /( · | — )/;
 const I18N_SKIP = "script,style,textarea,.notranslate";
@@ -52,15 +53,15 @@ const i18nObs = new MutationObserver((muts) => {
 });
 function i18nWatch() { i18nObs.observe(document.body, { childList: true, subtree: true, characterData: true }); }
 
-function setLang(l) {
+function setLang(l, nosave) {
   LANG = l;
-  try { localStorage.setItem("mbLang", l); } catch {}
+  if (!nosave) try { localStorage.setItem("mbLang", l); } catch {}
   document.documentElement.lang = l;
   i18nObs.disconnect();
   if (typeof rerender === "function" && document.querySelector("#view .notranslate")) rerender();   // dil biçimli tarihler yeniden çizilsin
+  if (document.body.classList.contains("auth-on") && typeof authRender === "function") authRender();   // önce çiz, sonra çevir
   i18nTree(document.body);
   i18nMenu();
-  if (document.body.classList.contains("auth-on") && typeof authRender === "function") authRender();
   i18nWatch();
 }
 function i18nMenu() {
@@ -72,4 +73,19 @@ function i18nMenu() {
 document.addEventListener("click", (e) => { if (!e.target.closest("#langBox")) $("#langBox")?.classList.remove("open"); });
 
 i18nMenu();
-setLang(LANG);
+setLang(LANG, true);   // açılışta uygula ama “seçildi” sayma
+
+// İlk ziyaret: dil hiç seçilmediyse sor (tarayıcının dili desteklenen dillerdense öne çıkar)
+function langAsk() {
+  if (LANG_SAVED) return;
+  const flags = { tr: "🇹🇷", en: "🇬🇧", es: "🇪🇸", de: "🇩🇪", ru: "🇷🇺" };
+  const sug = [...(navigator.languages || []), navigator.language || ""].map((x) => x.slice(0, 2).toLowerCase()).find((x) => LANGS.some(([k]) => k === x)) || "en";
+  const d = document.createElement("div");
+  d.id = "langAsk"; d.className = "lang-ask notranslate";
+  d.innerHTML = `<div class="la-card"><img src="senso-logo.png" alt="Senso Cosmetics"><h2>Choose your language</h2>
+    <p>Dil seçin · Elija su idioma · Sprache wählen · Выберите язык</p>
+    <div class="la-grid">${LANGS.map(([k, l]) => `<button class="${k === sug ? "sug" : ""}" onclick="langPick('${k}')"><span>${flags[k]}</span><b>${l}</b></button>`).join("")}</div></div>`;
+  document.body.appendChild(d);
+}
+function langPick(k) { setLang(k); document.getElementById("langAsk")?.remove(); }
+langAsk();
