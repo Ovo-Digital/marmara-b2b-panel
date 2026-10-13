@@ -558,11 +558,11 @@ const cfgProducts = () => ({ id: "products", item: "#view tr[data-lfrow='p']", n
     { t: "sel", k: "gtip", label: "GTİP: tümü", opts: [["1", "GTİP girilmiş"], ["0", "GTİP eksik"]], more: 1 },
     { t: "num", k: "n", label: "Liste fiyatı" }, { t: "num", k: "box", label: "Koli içi adet" }],
   sorts: [["cat", "Katalog sırası", "ord", 1, "num"], ["name", "Ad (A–Z)", "sname", 1], ["pa", "Fiyat (düşük → yüksek)", "n", 1, "num"], ["pd", "Fiyat (yüksek → düşük)", "n", -1, "num"], ["sku", "SKU", "ssku", 1]] });
-const cfgCustProducts = () => ({ id: "cproducts", en: 1, item: "#view .pcard[data-lfrow='p']", noun: "products", empty: "#pfEmpty", ph: "Search product name, SKU or barcode…",
-  fields: [{ t: "sel", k: "brand", label: "All brands", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.brand)).map((b) => [b, b]) },
-    { t: "sel", k: "cat", label: "All categories", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.cat)).map((c) => [c, c]) },
-    { t: "sel", k: "incart", label: "Cart: all", opts: [["1", "In my cart"]], more: 1 }, { t: "num", k: "n", label: "Unit price" }],
-  sorts: [["cat", "Catalogue order", "ord", 1, "num"], ["name", "Name (A–Z)", "sname", 1], ["pa", "Price (low → high)", "n", 1, "num"], ["pd", "Price (high → low)", "n", -1, "num"]] });
+const cfgCustProducts = (en = authSession()?.role !== "admin") => ({ id: "cproducts", en, item: "#view .pcard[data-lfrow='p']", noun: en ? "products" : "ürün", empty: "#pfEmpty", ph: en ? "Search product name, SKU or barcode…" : "Ürün adı, SKU veya barkod ara…",
+  fields: [{ t: "sel", k: "brand", label: en ? "All brands" : "Tüm markalar", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.brand)).map((b) => [b, b]) },
+    { t: "sel", k: "cat", label: en ? "All categories" : "Tüm kategoriler", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.cat)).map((c) => [c, en ? c : CAT_TR[c] || c]) },
+    { t: "sel", k: "incart", label: en ? "Cart: all" : "Sepet: tümü", opts: [["1", en ? "In my cart" : "Sepettekiler"]], more: 1 }, { t: "num", k: "n", label: en ? "Unit price" : "Birim fiyat" }],
+  sorts: [["cat", en ? "Catalogue order" : "Katalog sırası", "ord", 1, "num"], ["name", en ? "Name (A–Z)" : "Ad (A–Z)", "sname", 1], ["pa", en ? "Price (low → high)" : "Fiyat (düşük → yüksek)", "n", 1, "num"], ["pd", en ? "Price (high → low)" : "Fiyat (yüksek → düşük)", "n", -1, "num"]] });
 const cfgPayments = () => ({ id: "payments", item: "#view tr[data-lfrow='pay']", noun: "proforma", empty: "#payEmpty", ph: "Sipariş no, müşteri veya PI ara…", sum: { attr: "bal", cur: "cur", label: "açık bakiye" },
   fields: [{ t: "sel", k: "pay", label: "Ödeme: tümü", opts: PAY_OPTS() }, { t: "sel", k: "cust", label: "Tüm müşteriler", opts: uniq(ORDERS.filter((o) => o.stage >= 2).map((o) => o.cust)).map(C).filter(Boolean).map((c) => [c.id, pfEsc(c.name)]) },
     { t: "sel", k: "cur", label: "Para birimi: tümü", opts: [["USD", "USD"], ["EUR", "EUR"]], more: 1 }, { t: "date", k: "d", label: "Sipariş tarihi" }, { t: "num", k: "n", label: "Tutar" }],
@@ -753,13 +753,36 @@ function confirmDeleteOrder(no) {
 // Admin: müşteri adına sipariş → müşteri seçilerek ürün ekranı açılır
 function newOrderFor(id) { state.actAs = id || null; state.cart = {}; if (id) ME = id; go("admin/neworder"); }
 function setActAs(id) { state.actAs = id || null; if (id) ME = id; rerender(); }
+// Admin: müşteri adına sipariş — aranabilir müşteri seçici (firma, kişi, e-posta, ülke, hesap no)
 const actAsBar = () => {
   if (authSession()?.role !== "admin") return "";
-  const list = CUSTOMERS.filter((c) => c.status === "Active").sort((a, b) => a.name.localeCompare(b.name));
-  return `<div class="card act-as ${state.actAs ? "" : "need"}"><span>${ic("user")}</span><b>Sipariş verilen müşteri</b>
-    <select class="input" onchange="setActAs(this.value)"><option value="">Müşteri seçin…</option>${list.map((c) => `<option value="${c.id}" ${state.actAs === c.id ? "selected" : ""}>${c.flag || ""} ${c.name}</option>`).join("")}</select>
-    ${state.actAs ? `<small class="muted">Fiyatlar bu müşterinin seviyesinden gösterilir</small>` : `<small class="warn-t">Siparişi kime girdiğinizi seçin</small>`}</div>`;
+  const sel = state.actAs ? C(state.actAs) : null;
+  return `<div class="card act-as ${sel ? "" : "need"}"><span>${ic("user")}</span><b>Sipariş verilen müşteri</b>
+    ${sel ? `<div class="aa-chosen notranslate"><span class="aa-flag">${sel.flag || ""}</span><div><b>${pfEsc(sel.name)}</b><small>${pfEsc([sel.country, sel.email, LEVELS[levelOf(sel.id) - 1]?.name, sel.sales ? "Sorumlu: " + sel.sales : ""].filter(Boolean).join(" · "))}</small></div><button class="btn sm" onclick="setActAs('')">${ic("refresh")} Değiştir</button></div>`
+      : `<div class="aa-pick"><span class="aa-ic">${ic("search")}</span><input class="input" id="aaQ" autocomplete="off" placeholder="Müşteri ara: firma, kişi, e-posta, ülke ya da hesap no…" oninput="aaSearch(this.value)" onfocus="aaSearch(this.value)" onkeydown="aaKey(event)"><div class="aa-list" id="aaList"></div></div>
+         <small class="warn-t">Siparişi kime girdiğinizi seçin</small>`}</div>`;
 };
+let aaIdx = 0, aaRes = [];
+function aaSearch(q) {
+  const t = (c) => `${c.name} ${c.contact || ""} ${c.email || ""} ${c.country || ""} ${c.city || ""} ${c.account || ""} ${c.id}`;
+  aaRes = CUSTOMERS.filter((c) => c.status === "Active" && (!q.trim() || srchHit(t(c), q))).sort((a, b) => a.name.localeCompare(b.name, "tr")).slice(0, 40);
+  aaIdx = 0; aaDraw(q);
+}
+function aaDraw(q) {
+  const box = $("#aaList"); if (!box) return;
+  const total = CUSTOMERS.filter((c) => c.status === "Active").length;
+  box.innerHTML = aaRes.length ? aaRes.map((c, i) => `<button type="button" class="aa-item ${i === aaIdx ? "on" : ""}" onmousedown="event.preventDefault();setActAs('${c.id}')"><span class="aa-flag">${c.flag || ""}</span><span><b>${pfEsc(c.name)}</b><small>${pfEsc([c.country, c.contact, c.email].filter((x) => x && x !== "—").join(" · "))}</small></span></button>`).join("") + (aaRes.length === 40 ? `<div class="aa-more">İlk 40 sonuç — aramayı daraltın (${total} aktif müşteri)</div>` : "")
+    : `<div class="aa-more">“${pfEsc(q)}” ile eşleşen aktif müşteri yok</div>`;
+  box.classList.add("open");
+  box.querySelector(".aa-item.on")?.scrollIntoView({ block: "nearest" });
+}
+function aaKey(e) {
+  if (e.key === "ArrowDown") { e.preventDefault(); aaIdx = Math.min(aaRes.length - 1, aaIdx + 1); aaDraw(e.target.value); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); aaIdx = Math.max(0, aaIdx - 1); aaDraw(e.target.value); }
+  else if (e.key === "Enter") { e.preventDefault(); if (aaRes[aaIdx]) setActAs(aaRes[aaIdx].id); }
+  else if (e.key === "Escape") $("#aaList")?.classList.remove("open");
+}
+document.addEventListener("mousedown", (e) => { if (!e.target.closest(".aa-pick")) $("#aaList")?.classList.remove("open"); });
 const actAsMissing = () => authSession()?.role === "admin" && !state.actAs;
 
 ADMIN.order = (no) => {

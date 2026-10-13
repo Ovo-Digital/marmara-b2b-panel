@@ -574,3 +574,21 @@ body.dv-on { overflow: hidden; }
 .lf-sum { font-size: 13px; color: var(--muted); margin-top: 10px; }
 .lf-sum b { color: var(--text); }
 @media (max-width: 760px) { .lf-range { width: 100%; } .lf-range input { flex: 1; width: auto; } }
+
+/* müşteri adına sipariş: aranabilir müşteri seçici */
+.act-as .aa-pick { position: relative; flex: 1 1 420px; max-width: 640px; }
+.aa-pick .aa-ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); display: grid; }
+.aa-pick .aa-ic .ic { width: 17px; height: 17px; }
+.aa-pick input { width: 100%; height: 42px; padding-left: 38px; }
+.aa-list { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 50; background: var(--card); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 18px 40px rgba(0,0,0,0.14); max-height: 360px; overflow: auto; padding: 6px; }
+.aa-list.open { display: block; }
+.aa-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 9px 10px; border-radius: 8px; cursor: pointer; font: inherit; color: var(--text); }
+.aa-item:hover, .aa-item.on { background: var(--accent-bg); }
+.aa-item b { display: block; font-weight: 600; }
+.aa-item small, .aa-chosen small { color: var(--muted); font-size: 12.5px; }
+.aa-flag { font-size: 20px; width: 26px; text-align: center; flex: none; }
+.aa-more { padding: 10px; font-size: 12.5px; color: var(--muted); text-align: center; }
+.aa-chosen { display: flex; align-items: center; gap: 12px; flex: 1 1 420px; background: var(--card); border: 1px solid var(--line-2); border-radius: 12px; padding: 8px 10px 8px 12px; }
+.aa-chosen b { display: block; }
+.aa-chosen > div { flex: 1; min-width: 0; }
+.aa-chosen small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
