@@ -239,8 +239,8 @@ const USERS_BY_MODE = {
 };
 
 // Admin sayfa yetkileri (kullanıcı yönetiminde seçilir) + hazır roller
-const PERMS = [["dashboard", "Gösterge"], ["notifications", "Aksiyonlar"], ["orders", "Siparişler"], ["customers", "Müşteriler"], ["pricing", "Fiyatlandırma"], ["products", "Ürünler"], ["finance", "Finans"], ["reports", "Raporlar"], ["users", "Kullanıcılar & Yetkiler"], ["settings", "Ayarlar"]];
-const ROLE_PRESETS = [["Super Admin", PERMS.map(([k]) => k)], ["Satış", ["dashboard", "notifications", "orders", "customers", "pricing", "products"]], ["Finans", ["dashboard", "orders", "customers", "finance", "reports"]], ["Operasyon", ["dashboard", "notifications", "orders", "products"]], ["Yönetim (izleme)", ["dashboard", "orders", "customers", "reports"]]];
+const PERMS = [["dashboard", "Gösterge"], ["notifications", "Aksiyonlar"], ["orders", "Siparişler"], ["customers", "Müşteriler"], ["pricing", "Fiyatlandırma"], ["products", "Ürünler"], ["stock", "Stok"], ["finance", "Finans"], ["reports", "Raporlar"], ["users", "Kullanıcılar & Yetkiler"], ["settings", "Ayarlar"]];
+const ROLE_PRESETS = [["Super Admin", PERMS.map(([k]) => k)], ["Satış", ["dashboard", "notifications", "orders", "customers", "pricing", "products"]], ["Finans", ["dashboard", "orders", "customers", "finance", "reports"]], ["Operasyon", ["dashboard", "notifications", "orders", "products"]], ["Yönetim (izleme)", ["dashboard", "orders", "customers", "reports"]], ["Stok Sorumlusu", ["stock"]]];
 const PAGE_PERM = { order: "orders", neworder: "orders", checkout: "orders", customer: "customers", application: "customers", product: "products", loading: "orders", shipments: "orders", forecast: "dashboard", documents: "dashboard", marketing: "dashboard" };
 const can = (key) => { const s = authSession(); return !s || s.role !== "admin" || !s.perms || s.perms.includes(key); };
 const NAV = {
@@ -254,6 +254,7 @@ const NAV = {
     ["pricing", "Fiyatlandırma", "tag"],
     ["Ürün"],
     ["products", "Ürünler", "box"],
+    ["stock", "Stok", "layers"],
     ["Finans & Rapor"],
     ["finance", "Finans", "wallet"],
     ["reports", "Raporlar", "chart"],
@@ -552,7 +553,7 @@ const cfgCustomers = () => ({ id: "customers", item: "#view tr[data-lfrow='c']",
   sorts: [["name", "Ad (A–Z)", "sname", 1], ["namez", "Ad (Z–A)", "sname", -1], ["new", "En yeni kayıt", "d", -1], ["bal", "Açık bakiye (yüksek → düşük)", "n", -1, "num"], ["last", "Son sipariş (yeni → eski)", "slast", -1], ["country", "Ülke", "country", 1]] });
 const cfgProducts = () => ({ id: "products", item: "#view tr[data-lfrow='p']", noun: "ürün", empty: "#pfEmpty", ph: "Ürün adı, SKU, barkod veya kategori ara…",
   fields: [{ t: "sel", k: "brand", label: "Tüm markalar", opts: uniq(PRODUCTS.map((p) => p.brand)).map((b) => [b, b]) },
-    { t: "sel", k: "cat", label: "Tüm kategoriler", opts: uniq(PRODUCTS.map((p) => p.cat)).map((c) => [c, CAT_TR[c] || c]) },
+    { t: "sel", k: "cat", label: "Tüm kategoriler", opts: uniq(PRODUCTS.map((p) => p.cat)).map((c) => [c, c]) },
     { t: "sel", k: "act", label: "Tüm durumlar", opts: [["on", "Aktif"], ["off", "Pasif"]] },
     { t: "sel", k: "img", label: "Görsel: tümü", opts: [["1", "Görseli olan"], ["0", "Görseli eksik"]], more: 1 },
     { t: "sel", k: "gtip", label: "GTİP: tümü", opts: [["1", "GTİP girilmiş"], ["0", "GTİP eksik"]], more: 1 },
@@ -560,7 +561,7 @@ const cfgProducts = () => ({ id: "products", item: "#view tr[data-lfrow='p']", n
   sorts: [["cat", "Katalog sırası", "ord", 1, "num"], ["name", "Ad (A–Z)", "sname", 1], ["pa", "Fiyat (düşük → yüksek)", "n", 1, "num"], ["pd", "Fiyat (yüksek → düşük)", "n", -1, "num"], ["sku", "SKU", "ssku", 1]] });
 const cfgCustProducts = (en = authSession()?.role !== "admin") => ({ id: "cproducts", en, item: "#view .pcard[data-lfrow='p']", noun: en ? "products" : "ürün", empty: "#pfEmpty", ph: en ? "Search product name, SKU or barcode…" : "Ürün adı, SKU veya barkod ara…",
   fields: [{ t: "sel", k: "brand", label: en ? "All brands" : "Tüm markalar", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.brand)).map((b) => [b, b]) },
-    { t: "sel", k: "cat", label: en ? "All categories" : "Tüm kategoriler", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.cat)).map((c) => [c, en ? c : CAT_TR[c] || c]) },
+    { t: "sel", k: "cat", label: en ? "All categories" : "Tüm kategoriler", opts: uniq(PRODUCTS.filter(isActive).map((p) => p.cat)).map((c) => [c, c]) },
     { t: "sel", k: "incart", label: en ? "Cart: all" : "Sepet: tümü", opts: [["1", en ? "In my cart" : "Sepettekiler"]], more: 1 }, { t: "num", k: "n", label: en ? "Unit price" : "Birim fiyat" }],
   sorts: [["cat", en ? "Catalogue order" : "Katalog sırası", "ord", 1, "num"], ["name", en ? "Name (A–Z)" : "Ad (A–Z)", "sname", 1], ["pa", en ? "Price (low → high)" : "Fiyat (düşük → yüksek)", "n", 1, "num"], ["pd", en ? "Price (high → low)" : "Fiyat (yüksek → düşük)", "n", -1, "num"]] });
 const cfgPayments = () => ({ id: "payments", item: "#view tr[data-lfrow='pay']", noun: "proforma", empty: "#payEmpty", ph: "Sipariş no, müşteri veya PI ara…", sum: { attr: "bal", cur: "cur", label: "açık bakiye" },
@@ -1143,15 +1144,93 @@ ADMIN.forecast = () => {
 };
 
 // ——— Ürünler ———
+// ——— Stok yönetimi (stok adet olarak tutulur; koli = adet / koli içi) ———
+const stockOf = (p) => (p.stock == null ? null : +p.stock);
+const stState = (p) => { const v = stockOf(p); if (v == null) return "none"; if (v <= 0) return "out"; if (p.critical != null && v <= +p.critical) return "low"; return "in"; };
+const STOCK_PILL = { in: ["ok", "Stokta"], low: ["warn", "Kritik"], out: ["err", "Stok yok"], none: ["plain", "Girilmedi"] };
+const stPill = (p) => { const [c, l] = STOCK_PILL[stState(p)]; return `<span class="pill ${c}">${l}</span>`; };
+const boxesOf = (p) => (stockOf(p) == null || !p.pcsBox ? null : Math.floor(stockOf(p) / p.pcsBox));
+const cfgStock = () => ({ id: "stock", item: "#view tr[data-lfrow='s']", noun: "ürün", empty: "#stEmpty", ph: "Ürün adı, SKU veya barkod ara…",
+  fields: [{ t: "sel", k: "state", label: "Tüm stok durumları", opts: [["in", "Stokta"], ["low", "Kritik seviyede"], ["out", "Stok yok"], ["none", "Stok girilmemiş"]] },
+    { t: "sel", k: "brand", label: "Tüm markalar", opts: uniq(PRODUCTS.map((p) => p.brand)).map((b) => [b, b]) },
+    { t: "sel", k: "cat", label: "Tüm kategoriler", opts: uniq(PRODUCTS.map((p) => p.cat)).map((c) => [c, c]) },
+    { t: "num", k: "n", label: "Stok (adet)" }],
+  sorts: [["cat", "Katalog sırası", "ord", 1, "num"], ["low", "Stok (az → çok)", "n", 1, "num"], ["high", "Stok (çok → az)", "n", -1, "num"], ["name", "Ad (A–Z)", "sname", 1], ["upd", "Son hareket", "upd", -1]] });
+ADMIN.stock = () => {
+  const cnt = (st) => PRODUCTS.filter((p) => stState(p) === st).length;
+  const rows = PRODUCTS.map((p) => { const v = stockOf(p), bx = boxesOf(p), last = (p.stockLog || [])[0];
+    return `<tr data-lfrow="s" data-q="${pfEsc(prodText(p))}" data-state="${stState(p)}" data-brand="${pfEsc(p.brand)}" data-cat="${pfEsc(p.cat)}" data-n="${v ?? ""}" data-ord="${PRODUCTS.indexOf(p)}" data-sname="${pfEsc(p.name)}" data-upd="${last ? last[0] : ""}">
+      <td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td>
+      <td class="muted">${p.brand}<br><small>${p.cat}</small></td>
+      <td class="r">${p.pcsBox} adet</td>
+      <td class="r"><b class="st-n">${v == null ? "—" : num(v)}</b><br><small class="muted">${bx == null ? "" : `${num(bx)} koli${v % p.pcsBox ? ` + ${v % p.pcsBox} adet` : ""}`}</small></td>
+      <td class="r muted">${p.critical != null ? num(p.critical) : "—"}</td>
+      <td>${stPill(p)}${last ? `<br><small class="muted">${fmtDate(last[0])}</small>` : ""}</td>
+      <td class="r"><div class="row st-act"><button class="btn sm gold" onclick="stockMove('${pfEsc(p.sku)}',1)">+ Giriş</button><button class="btn sm" onclick="stockMove('${pfEsc(p.sku)}',-1)">− Çıkış</button><button class="btn sm ghost" onclick="stockMove('${pfEsc(p.sku)}',0)">Sayım</button><button class="btn sm ghost" title="Hareket geçmişi" onclick="stockHist('${pfEsc(p.sku)}')">${ic("clock")}</button></div></td></tr>`; }).join("");
+  return `${head("Stok", "", `<button class="btn" onclick="stockExport()">${ic("download")} Excel'e aktar</button>`)}
+  <div class="grid g4">${kpi(cnt("in") + cnt("low"), "Stokta olan ürün", "", "box")}${kpi(cnt("low"), "Kritik seviyede", "", "alert")}${kpi(cnt("out"), "Stok yok", "", "x")}${kpi(cnt("none"), "Stok girilmemiş", "", "file")}</div>
+  <div class="mt">${lfBar(cfgStock())}</div>
+  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ürün</th><th>Marka / Kategori</th><th class="r">Koli içi</th><th class="r">Stok (adet)</th><th class="r">Kritik</th><th>Durum</th><th class="r"></th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="pf-empty muted" id="stEmpty" style="display:none">Bu filtrede ürün yok.</div></div></div>`;
+};
+const STOCK_REASONS = { 1: ["Üretim girişi", "İade", "Transfer girişi", "Diğer"], "-1": ["Sevkiyat / satış", "Fire / hasar", "Numune", "Transfer çıkışı", "Diğer"], 0: ["Sayım düzeltmesi"] };
+function stockMove(sku, dir) {
+  const p = P(sku), v = stockOf(p) ?? 0, title = dir > 0 ? "Stok girişi" : dir < 0 ? "Stok çıkışı" : "Sayım — güncel stoğu gir";
+  modal(`<h2>${title}</h2><p class="muted" style="margin-top:-6px"><b>${p.name}</b> · <span class="mono">${p.sku}</span> · koli içi ${p.pcsBox} adet</p>
+  <div class="stat-row"><span>Mevcut stok</span><b>${num(v)} adet${p.pcsBox ? ` · ${num(Math.floor(v / p.pcsBox))} koli` : ""}</b></div>
+  <div class="form cols2 mt">
+    <div class="field"><label>${dir === 0 ? "Sayılan miktar" : "Miktar"}</label><input class="input" id="smQty" type="number" min="0" step="1" oninput="stockPreview('${pfEsc(sku)}',${dir})" autofocus></div>
+    <div class="field"><label>Birim</label><div class="seg" id="smUnit"><button type="button" class="on" data-u="box" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===this));stockPreview('${pfEsc(sku)}',${dir})">Koli</button><button type="button" data-u="pcs" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===this));stockPreview('${pfEsc(sku)}',${dir})">Adet</button></div></div>
+    <div class="field"><label>Sebep</label><select class="input" id="smWhy">${STOCK_REASONS[dir].map((r) => `<option>${r}</option>`).join("")}</select></div>
+    <div class="field"><label>Not / belge no</label><input class="input" id="smNote" placeholder="Ör. üretim emri 1042"></div>
+    ${dir === 0 ? `<div class="field span2"><label>Kritik stok seviyesi (adet, isteğe bağlı)</label><input class="input" id="smCrit" type="number" min="0" value="${p.critical ?? ""}" placeholder="Bu seviyenin altına düşünce “Kritik” görünür"></div>` : ""}
+  </div>
+  <div class="notice info mt" id="smPrev">${ic("info")}<span>Miktarı girin.</span></div>
+  <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="stockSave('${pfEsc(sku)}',${dir})">Kaydet</button></div>`);
+  setTimeout(() => $("#smQty")?.focus(), 50);
+}
+function stockQty(p) { const q = Math.max(0, Math.round(+$("#smQty").value || 0)), u = $("#smUnit .on")?.dataset.u; return u === "box" ? q * (p.pcsBox || 1) : q; }
+function stockPreview(sku, dir) {
+  const p = P(sku), v = stockOf(p) ?? 0, q = stockQty(p), after = dir === 0 ? q : v + dir * q;
+  $("#smPrev").className = "notice mt " + (after < 0 ? "err" : "info");
+  $("#smPrev").innerHTML = `${ic(after < 0 ? "alert" : "info")}<span>${after < 0 ? `Stok eksiye düşemez — en fazla ${num(v)} adet çıkış yapılabilir.` : `Yeni stok: <b>${num(after)} adet</b>${p.pcsBox ? ` (${num(Math.floor(after / p.pcsBox))} koli${after % p.pcsBox ? ` + ${after % p.pcsBox} adet` : ""})` : ""} · değişim ${after - v >= 0 ? "+" : ""}${num(after - v)} adet`}</span>`;
+}
+function stockSave(sku, dir) {
+  const p = P(sku), v = stockOf(p) ?? 0, q = stockQty(p);
+  if (!q && dir !== 0) return toast("Miktar girin", "alert");
+  if ($("#smQty").value === "") return toast("Miktar girin", "alert");
+  const after = dir === 0 ? q : v + dir * q;
+  if (after < 0) return toast(`Stok eksiye düşemez (mevcut ${num(v)} adet)`, "alert");
+  const who = authSession()?.name || "";
+  p.stock = after;
+  if (dir === 0 && $("#smCrit")) { const c = $("#smCrit").value; p.critical = c === "" ? null : Math.max(0, +c); }
+  p.stockLog = [[new Date().toISOString(), after - v, $("#smWhy").value, $("#smNote").value.trim(), who, after], ...(p.stockLog || [])].slice(0, 100);
+  closeModal(); toast(`${p.sku}: ${after - v >= 0 ? "+" : ""}${num(after - v)} adet · yeni stok ${num(after)}`, "box"); rerender();
+}
+function stockHist(sku) {
+  const p = P(sku), log = p.stockLog || [];
+  modal(`<h2>Stok hareketleri</h2><p class="muted" style="margin-top:-6px"><b>${p.name}</b> · <span class="mono">${p.sku}</span> · güncel ${stockOf(p) == null ? "—" : num(stockOf(p)) + " adet"}</p>
+  ${log.length ? `<div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto"><table class="tbl"><thead><tr><th>Tarih</th><th class="r">Değişim</th><th>Sebep</th><th>Not</th><th>Kim</th><th class="r">Sonra</th></tr></thead><tbody>
+    ${log.map(([d, ch, why, note, who, after]) => `<tr><td class="muted">${new Date(d).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}</td><td class="r strong ${ch >= 0 ? "ok-t" : "err-t"}">${ch >= 0 ? "+" : ""}${num(ch)}</td><td>${pfEsc(why)}</td><td class="muted">${pfEsc(note || "—")}</td><td>${pfEsc(who || "—")}</td><td class="r">${num(after)}</td></tr>`).join("")}
+  </tbody></table></div>` : '<p class="muted">Henüz hareket yok.</p>'}
+  <div class="m-actions"><button class="btn" onclick="closeModal()">Kapat</button></div>`);
+}
+async function stockExport() {
+  try { await loadXlsx(); } catch (e) { return toast(e.message, "alert"); }
+  const rows = PRODUCTS.map((p) => [p.ean || "", p.sku, p.name, p.brand, p.pcsBox, boxesOf(p) ?? "", stockOf(p) ?? "", p.critical ?? "", STOCK_PILL[stState(p)][1]]);
+  const ws = XLSX.utils.aoa_to_sheet([["Barkod", "SKU", "Ürün", "Marka", "Koli içi adet", "Koli", "Stok adet", "Kritik stok", "Durum"], ...rows]);
+  ws["!cols"] = [16, 16, 44, 16, 12, 8, 12, 12, 12].map((wch) => ({ wch }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stok"); XLSX.writeFile(wb, `senso-stok-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 ADMIN.products = () => {
   const act = PRODUCTS.filter(isActive).length, sel = state.psel.filter((x) => P(x));
   return `${head("Ürünler", "", `<button class="btn" onclick="exportProducts()">${ic("download")} Dışa Aktar</button><button class="btn" onclick="bulkImport()">${ic("upload")} Toplu Ürün Aç / Güncelle</button><button class="btn gold" onclick="productForm()">${ic("plus")} Yeni Ürün</button>`)}
   <div class="grid g4">${kpi(act, "Aktif ürün", "", "box")}${kpi(PRODUCTS.length - act, "Pasif ürün", "", "x")}${kpi(new Set(PRODUCTS.map((p) => p.cat)).size, "Kategori", "", "file")}${kpi(PRODUCTS.filter((p) => !p.img).length, "Görseli eksik", "", "image")}</div>
   <div class="mt">${lfBar(cfgProducts())}</div>
   <div class="bulk-bar ${sel.length ? "on" : ""}" id="bulkBar"><b id="bulkN">${sel.length} ürün seçili</b><button class="btn sm danger" onclick="bulkActive(false)">Pasife al</button><button class="btn sm" onclick="bulkActive(true)">Aktif et</button><button class="btn sm ghost" onclick="state.psel=[];rerender()">Seçimi temizle</button></div>
-  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="c" style="width:36px"><input type="checkbox" title="Görünenlerin hepsini seç" onclick="selVisible(this.checked)"></th><th>Ürün</th><th>Marka / Kategori</th><th>Barkod</th><th class="r">Koli içi</th><th class="r">Liste fiyatı</th><th>Durum</th></tr></thead><tbody>
+  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="c" style="width:36px"><input type="checkbox" title="Görünenlerin hepsini seç" onclick="selVisible(this.checked)"></th><th>Ürün</th><th>Marka / Kategori</th><th>Barkod</th><th class="r">Koli içi</th><th class="r">Liste fiyatı</th><th class="r">Stok</th><th>Durum</th></tr></thead><tbody>
   ${PRODUCTS.map((p) => `<tr class="click ${isActive(p) ? "" : "off"}" ${prodAttrs(p)} onclick="go('admin/product/${encodeURIComponent(p.sku)}')"><td class="c" onclick="event.stopPropagation()"><input type="checkbox" class="psel" value="${pfEsc(p.sku)}" ${sel.includes(p.sku) ? "checked" : ""} onchange="selToggle(this.value,this.checked)"></td><td><div class="prod-cell">${thumb(p)}<div><b>${p.name}</b><br><small class="mono">${p.sku}</small></div></div></td><td class="muted">${p.brand}<br><small>${p.cat}</small></td>
-    <td class="mono muted">${p.ean || "—"}</td><td class="r">${p.pcsBox} adet</td><td class="r strong">${p.prices[0] != null ? money(p.prices[0], LEVELS[0].cur, 2) : "—"}</td><td>${isActive(p) ? '<span class="pill ok plain">Aktif</span>' : '<span class="pill err plain">Pasif</span>'}</td></tr>`).join("")}
+    <td class="mono muted">${p.ean || "—"}</td><td class="r">${p.pcsBox} adet</td><td class="r strong">${p.prices[0] != null ? money(p.prices[0], LEVELS[0].cur, 2) : "—"}</td><td class="r">${stockOf(p) == null ? '<span class="dim">—</span>' : `${num(stockOf(p))}<br><small class="muted">${num(boxesOf(p))} koli</small>`}</td><td>${isActive(p) ? '<span class="pill ok plain">Aktif</span>' : '<span class="pill err plain">Pasif</span>'}</td></tr>`).join("")}
   </tbody></table><div class="pf-empty muted" id="pfEmpty" style="display:none">Aramaya uyan ürün yok</div></div></div>`;
 };
 function selToggle(sku, on) {

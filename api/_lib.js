@@ -9,7 +9,7 @@ const LISTS = { orders: "no", customers: "id", regs: "u", products: "sku" };
 const MAPS = ["logs", "prep", "palletCheck", "meta"];
 const empty = () => ({ rev: 0, updatedAt: null, orders: [], customers: [], regs: [], products: [], staff: [], logs: {}, prep: {}, palletCheck: {}, meta: {} });
 // admin paneli sayfa yetkileri (kullanıcı yönetiminde seçilir)
-const PERMS = ["dashboard", "notifications", "orders", "customers", "pricing", "products", "finance", "reports", "users", "settings"];
+const PERMS = ["dashboard", "notifications", "orders", "customers", "pricing", "products", "stock", "finance", "reports", "users", "settings"];
 const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
 const hashPw = (u, p) => sha(String(u).toLowerCase() + ":" + p);
 
