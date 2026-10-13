@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
       const find = (id) => doc.staff.find((x) => x.id === id);
       if (b.action === "create") {
         const u = L.emailKey(b.user && b.user.email), first = String(b.user.first || "").trim(), last = String(b.user.last || "").trim();
-        if (!u || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u) || !first) return { error: "Ad ve geçerli bir e-posta gerekli" };
+        if (!u || !(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u) || /^[a-z0-9._-]{3,40}$/.test(u)) || !first) return { error: "Ad ve geçerli bir e-posta ya da kullanıcı adı gerekli" };
         if (L.STAFF.some((s) => s.u === u) || doc.staff.some((s) => s.u === u)) return { error: "Bu e-posta ile bir kullanıcı zaten var" };
         if (doc.customers.some((c) => L.emailKey(c.email) === u) || doc.regs.some((r) => r.u === u)) return { error: "Bu e-posta bir müşteri hesabında kullanılıyor" };
         password = b.password && String(b.password).length >= 8 ? String(b.password) : L.randomPassword();

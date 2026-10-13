@@ -1494,7 +1494,7 @@ ADMIN.users = () => {
       <td class="r">${u.builtIn ? '<small class="muted">sistem hesabı</small>' : `<div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm" onclick="userForm('${u.id}')">${ic("edit")} Düzenle</button><button class="btn sm" onclick="userResetPw('${u.id}')">Şifre sıfırla</button><button class="btn sm ${u.active === false ? "" : "danger"}" onclick="userSetActive('${u.id}',${u.active === false})">${u.active === false ? "Aktif et" : "Pasife al"}</button></div>`}</td></tr>`;
   }).join("");
   return `${head("Kullanıcılar & Yetkiler", "", `<button class="btn gold" onclick="userForm()">${ic("plus")} Kullanıcı ekle</button>`)}
-  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ad Soyad</th><th>E-posta (giriş)</th><th>Unvan / Görev</th><th>Yetkiler</th><th>Durum</th><th class="r"></th></tr></thead><tbody>
+  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ad Soyad</th><th>Giriş adı</th><th>Unvan / Görev</th><th>Yetkiler</th><th>Durum</th><th class="r"></th></tr></thead><tbody>
   ${state.usersErr ? `<tr><td colspan="6"><div class="notice err">${ic("alert")}<span>Kullanıcılar yüklenemedi: ${pfEsc(state.usersErr)}</span></div></td></tr>` : !state.users ? `<tr><td colspan="6" class="muted">Yükleniyor…</td></tr>` : rows}
   </tbody></table></div></div>
   <div class="notice info mt">${ic("info")}<span>Kullanıcı, admin paneline e-posta ve şifresiyle girer; menüde yalnız yetkili olduğu sayfaları görür. Pasife alınan kullanıcı anında erişimini kaybeder. Şifreler yalnız oluşturulurken ve sıfırlanırken bir kez gösterilir.</span></div>`;
@@ -1505,7 +1505,7 @@ function userForm(id) {
   <div class="form cols2">
     <div class="field"><label>Ad *</label><input class="input" id="ufFirst" value="${pfEsc(u?.first || "")}"></div>
     <div class="field"><label>Soyad</label><input class="input" id="ufLast" value="${pfEsc(u?.last || "")}"></div>
-    <div class="field"><label>E-posta (giriş adı) *</label><input class="input notranslate" id="ufEmail" type="email" value="${pfEsc(u?.u || "")}" ${u ? "disabled" : ""}></div>
+    <div class="field"><label>E-posta ya da kullanıcı adı (giriş) *</label><input class="input notranslate" id="ufEmail" type="email" value="${pfEsc(u?.u || "")}" ${u ? "disabled" : ""}></div>
     <div class="field"><label>Unvan / Görev</label><input class="input" id="ufTitle" value="${pfEsc(u?.title || "")}" placeholder="Ör. İhracat Satış Uzmanı"></div>
     <div class="field span2"><label>Rol</label><select class="input" id="ufRole" onchange="userPreset(this.value)"><option value="">Özel (aşağıdan seçin)</option>${ROLE_PRESETS.map(([n], i) => `<option value="${i}">${n}</option>`).join("")}</select></div>
     <div class="field span2"><label>Yetkiler (görebileceği sayfalar)</label><div class="checks perm-checks">${PERMS.map(([k, l]) => `<label><input type="checkbox" class="ufPerm" value="${k}" ${has(k) ? "checked" : ""}>${l}</label>`).join("")}</div></div>
@@ -1523,7 +1523,7 @@ async function userSave(id) {
   const v = (k) => ($("#" + k)?.value || "").trim(), err = (m) => ($("#ufErr").textContent = m);
   const user = { first: v("ufFirst"), last: v("ufLast"), email: v("ufEmail"), title: v("ufTitle"), perms: [...document.querySelectorAll(".ufPerm:checked")].map((c) => c.value) };
   if (!user.first) return err("Ad zorunlu");
-  if (!id && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) return err("Geçerli bir e-posta girin");
+  if (!id && !(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email) || /^[a-z0-9._-]{3,40}$/i.test(user.email))) return err("Geçerli bir e-posta ya da kullanıcı adı girin (en az 3 karakter, boşluksuz)");
   if (!user.perms.length) return err("En az bir yetki seçin");
   const pw = v("ufPw"); if (!id && pw && pw.length < 8) return err("Şifre en az 8 karakter olmalı");
   try {
