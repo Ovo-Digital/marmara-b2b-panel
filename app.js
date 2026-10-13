@@ -1501,6 +1501,10 @@ const cartItems = () => Object.entries(state.cart).filter(([, b]) => b > 0);
 // Müşteri bildirimi: sipariş sevke hazır olunca final proforma hazır (sipariş açılınca okundu sayılır)
 const custNotices = () => sortOrders(ORDERS.filter((o) => o.cust === ME && o.custNotice && !o.custNotice.seen));
 const noticeCards = () => custNotices().map((o) => `<div class="notice gold" style="margin-bottom:12px">${ic("file")}<span><b>Your final proforma invoice is ready — order ${o.no}.</b> Your order is ready to ship; please review the proforma and complete any remaining payment.</span><button class="btn sm" onclick="go('customer/order/${o.no}')">View</button></div>`).join("");
+// Müşteri ana sayfası: “Nasıl sipariş verilir” videosu (portal diline göre)
+const howToCard = () => { const vl = ["tr", "en", "es", "de", "ru"].includes(LANG) ? LANG : "en";
+  return `<div class="card mt how-card"><div><span class="how-badge">${ic("info")} Video · 0:41</span><h3>How to place an order</h3><p class="muted">Watch the step-by-step guide: find products, add boxes, check your addresses, place your order and download your documents.</p></div>
+  <video class="notranslate" controls preload="none" playsinline poster="media/how-to-order-${vl}.jpg" src="media/how-to-order-${vl}.mp4"></video></div>`; };
 CUST.dashboard = () => {
   const mine = ORDERS.filter((o) => o.cust === ME);
   const active = mine.find((o) => o.stage < 5);
@@ -1509,6 +1513,7 @@ CUST.dashboard = () => {
   <div class="grid g4">${kpi(mine.filter((o) => o.stage < 5).length, "Active Orders", "In progress", "cart")}${kpi(mine.filter((o) => o.stage === 4).length, "Ready for Shipment", "Awaiting pickup", "truck")}${kpi("October", "Next Forecast", "Due in 5 days", "trend")}${kpi(12, "Orders", "Last 12 months", "box")}</div>
   ${active ? `<div class="card mt"><div class="card-h"><h3>Order ${active.no}</h3>${stagePill(active.stage, true)}</div>${stepper(active.stage, STAGES_EN)}
     <div class="between mt wrap"><span class="muted">${money(orderTotal(active), active.currency)} · Payment: ${payState(active)[0]}</span><button class="btn sm" onclick="go('customer/order/${active.no}')">View order ${ic("chevR")}</button></div></div>` : ""}
+  ${howToCard()}
   <div class="grid g-main mt"><div class="card"><div class="card-h"><h3>Recent Orders</h3><a class="sub" href="#/customer/orders">All →</a></div>${ordersTable(mine, true)}</div>
   <div class="card flat"><div class="card-h"><h3>Announcements</h3></div><ul class="tl"><li>New: Noir EDP 50 ml range now available to order.<small>22 Sep 2026</small></li><li>Q4 campaign on Hair Styling — see your net prices.<small>15 Sep 2026</small></li><li>Factory closed 29 Oct (national holiday).<small>10 Sep 2026</small></li></ul>
   <div class="notice gold">${ic("trend")}<span>Your October forecast is due. It helps us plan production for you.</span></div></div></div>`;

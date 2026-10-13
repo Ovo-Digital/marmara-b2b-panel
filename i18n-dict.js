@@ -1,5 +1,8 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "How to place an order": {"tr":"Nasıl sipariş verilir?","en":"How to place an order","es":"Cómo hacer un pedido","de":"So bestellen Sie","ru":"Как сделать заказ"},
+  "Watch the step-by-step guide: find products, add boxes, check your addresses, place your order and download your documents.": {"tr":"Adım adım rehberi izleyin: ürünleri bulun, koli ekleyin, adreslerinizi kontrol edin, siparişinizi verin ve belgelerinizi indirin.","en":"Watch the step-by-step guide: find products, add boxes, check your addresses, place your order and download your documents.","es":"Vea la guía paso a paso: busque productos, añada cajas, revise sus direcciones, haga su pedido y descargue sus documentos.","de":"Sehen Sie die Schritt-für-Schritt-Anleitung: Produkte finden, Kartons hinzufügen, Adressen prüfen, bestellen und Dokumente herunterladen.","ru":"Посмотрите пошаговую инструкцию: найдите товары, добавьте коробки, проверьте адреса, оформите заказ и скачайте документы."},
+  "Video · 0:41": {"tr":"Video · 0:41","en":"Video · 0:41","es":"Vídeo · 0:41","de":"Video · 0:41","ru":"Видео · 0:41"},
   "Üye ol": {"tr":"Üye ol","en":"Sign up","es":"Registrarse","de":"Registrieren","ru":"Регистрация"},
   "Delivery address *": {"tr":"Teslimat adresi *","en":"Delivery address *","es":"Dirección de entrega *","de":"Lieferadresse *","ru":"Адрес доставки *"},
   "Same as billing address": {"tr":"Fatura adresiyle aynı","en":"Same as billing address","es":"Igual que la dirección de facturación","de":"Wie Rechnungsadresse","ru":"Совпадает с адресом для счёта"},

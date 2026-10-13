@@ -531,3 +531,12 @@ body.dv-on { overflow: hidden; }
 /* sipariş durumu elle değiştirme */
 .stage-edit { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); flex-wrap: wrap; }
 .stage-edit select { width: auto; height: 32px; }
+
+/* müşteri ana sayfası: nasıl sipariş verilir videosu */
+.how-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 28px; align-items: center; }
+.how-card h3 { font-size: 22px; margin: 10px 0 8px; }
+.how-card p { line-height: 1.55; margin: 0; }
+.how-card video { width: 100%; border-radius: 12px; background: #111; display: block; aspect-ratio: 16 / 9; }
+.how-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent-t, #8a6a35); background: var(--accent-bg); padding: 4px 10px; border-radius: 99px; }
+.how-badge .ic { width: 14px; height: 14px; }
+@media (max-width: 900px) { .how-card { grid-template-columns: 1fr; } }
