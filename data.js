@@ -88,7 +88,7 @@ const COMPANY = {
   brand: "SENSO COSMETICS",
   legal: "SENSO KOZMETİK ÜRN. TURZ. SAN. VE TİC. LTD. ŞTİ.",
   address: "Baklacı Mah. Fatih Cad. Çevre Sok. No:20 Beykoz - Istanbul - TURKEY",
-  tax: "[Vergi dairesi / vergi no]",
+  tax: "BEYKOZ / 7610022105",
   phone: "+90 216 479 12 00",
   fax: "+90 216 479 12 08",
   email: "info@marmarabarber.com",            // proforma / invoice şablonundaki iletişim
