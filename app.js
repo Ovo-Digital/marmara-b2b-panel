@@ -914,8 +914,8 @@ const boxNet = (p) => p.net ?? +(p.kg * 0.86).toFixed(2);
 const boxGross = (p) => p.gross ?? p.kg;
 function docData(no) {
   const o = O(no), c = C(o.cust);
-  const ord = (sku) => { const i = PRODUCTS.findIndex((x) => x.sku === sku); return i < 0 ? 1e9 : i; };
-  const rows = o.items.slice().sort((a, b) => ord(a[0]) - ord(b[0])).map(([sku, b, pr]) => {
+  const ord = (sku) => { const i = PRODUCTS.findIndex((x) => x.sku === sku); return i < 0 ? 1e9 : i; };   // keepOrder: siparişin girildiği sıra korunur (ör. müşterinin sipariş Excel’i)
+  const rows = (o.keepOrder ? o.items.slice() : o.items.slice().sort((a, b) => ord(a[0]) - ord(b[0]))).map(([sku, b, pr]) => {
     const p = P(sku) || { sku, name: sku, pcsBox: 1, kg: 0, dims: [0, 0, 0], hs: "", ean: "" };
     const q = o.shipped?.[sku] ?? b, up = pr ?? orderPrice(o, p);
     return { p, sku, q, pcs: q * p.pcsBox, up, line: q * p.pcsBox * up, net: q * boxNet(p), gross: q * boxGross(p), cbm: (q * p.dims[0] * p.dims[1] * p.dims[2]) / 1e6 };
