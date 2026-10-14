@@ -98,7 +98,7 @@ const COMPANY = {
 };
 // Para birimine göre banka hesabı (belgelerde seçilen para biriminin hesabı görünür)
 const BANKS = {
-  USD: { bank: "[Banka adı / şube]", iban: "[USD hesap IBAN]", swift: "[SWIFT / BIC]" },
+  USD: { bank: "AKBANK – Tuzla Branch", iban: "TR56 0004 6008 8900 1000 1774 82", swift: "AKBKTRIS" },
   EUR: { bank: "[Banka adı / şube]", iban: "[EUR hesap IBAN]", swift: "[SWIFT / BIC]" },
 };
 
