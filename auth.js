@@ -6,7 +6,7 @@
 const ACCOUNTS = [
   { u: "admin", role: "admin", name: "Volkan Koçkan", title: "Super Admin" },
   { u: "ferhat", role: "admin", name: "Ferhat Şahin", title: "İhracat Bölge Müdürü", dash: "sales" },
-  { u: "gozde", role: "admin", name: "Gözde", title: "Export Manager / Final Approver", dash: "approve" },
+  { u: "gozde", role: "admin", name: "Gözde Yorgun", title: "Export Manager / Final Approver", dash: "approve" },
 ];
 const AUTH_KEY = "mbSession", REGS_KEY = "mbRegs";
 const HOME = { admin: "admin/dashboard", customer: "customer/dashboard" };
@@ -117,7 +117,7 @@ function authRender() {
       <a class="auth-back" onclick="authView='login';authRender()">${ic("chevL")} Giriş</a>
       <h1>B2B hesabı oluşturun</h1>
       <div class="form cols2">
-        ${f("Company name", "rgName", "text", 1)}<div class="field"><label>Country *</label><select class="input" id="rgCountry"><option value="">Select country…</option>${COUNTRIES.map((c) => `<option value="${c.name}">${c.flag} ${c.name}</option>`).join("")}</select></div>
+        ${f("Company name", "rgName", "text", 1)}<div class="field"><label>Country *</label><select class="input" id="rgCountry" onchange="dialFill(this.value,'#rgPhone')"><option value="">Select country…</option>${COUNTRIES.map((c) => `<option value="${c.name}">${c.flag} ${c.name}</option>`).join("")}</select></div>
         ${f("City", "rgCity")}${f("Tax / VAT number", "rgVat", "text", 1)}
         <div class="field span2"><label>Billing address *</label><textarea class="input" id="rgAddr" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div>
         <div class="field span2"><label>Delivery address *</label><label class="checks" style="margin:0 0 6px"><label><input type="checkbox" id="rgSame" onchange="$('#rgShip').disabled=this.checked;if(this.checked)$('#rgShip').value=$('#rgAddr').value"> Same as billing address</label></label><textarea class="input" id="rgShip" rows="2" placeholder="Street, no, postal code, city, country"></textarea></div>
@@ -125,7 +125,7 @@ function authRender() {
         <div class="field span2"><label>Web siteniz var mı?</label><div class="seg" style="max-width:260px"><button type="button" id="rgWebY" onclick="authWeb(true)">Evet</button><button type="button" id="rgWebN" class="on" onclick="authWeb(false)">Hayır</button></div></div>
         <div class="field span2" id="rgWebBox" style="display:none"><label>Web sitesi adresi *</label><input class="input" id="rgWeb" type="url" placeholder="https://www.ornek.com"></div>
         ${f("Contact name", "rgContact", "text", 1)}${f("Position", "rgPos")}
-        ${f("Business email", "rgEmail", "email", 1)}${f("WhatsApp / Phone", "rgPhone")}
+        ${f("Business email", "rgEmail", "email", 1)}${f("WhatsApp / Phone", "rgPhone", "tel")}
         <div class="field span2"><label>Interested brands</label><div class="checks">${["Barber Marmara", "Marmara", "Noir"].map((b) => `<label><input type="checkbox" class="rgBrand" value="${b}" checked>${b}</label>`).join("")}</div></div>
         ${f("Password", "rgPw", "password", 1)}${f("Confirm password", "rgPw2", "password", 1)}
       </div>

@@ -277,7 +277,7 @@ const NAV = {
 };
 
 // ——— yönlendirme ———
-function go(path) { location.hash = "#/" + path; }
+function go(path) { if (location.hash === "#/" + path) rerender(); else location.hash = "#/" + path; }   // aynı sayfadaysa hash değişmez → elle yeniden çiz
 function parse() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   const mode = ["admin", "customer"].includes(parts[0]) ? parts[0] : "admin";
@@ -601,8 +601,10 @@ ADMIN.notifications = () => {
 
 // ——— Müşteriler ———
 // Satış sorumlusu seçenekleri: yerleşik hesaplar + Kullanıcılar & Yetkiler'den eklenen aktif kullanıcılar
-const reps = () => [...ACCOUNTS.map((a) => ({ id: "builtin:" + a.u, u: a.u, name: a.name, title: a.title })),
-  ...(STORE.staff || []).filter((x) => x.active !== false).map((x) => ({ id: x.id, u: x.u, name: `${x.first} ${x.last}`.trim(), title: x.title }))];
+const repContact = (u) => (STORE.contacts || {})[u] || {};
+const reps = () => [...ACCOUNTS.map((a) => ({ id: "builtin:" + a.u, u: a.u, name: a.name, title: a.title, ...repContact(a.u) })),
+  ...(STORE.staff || []).filter((x) => x.active !== false && (x.perms || []).some((p) => p === "orders" || p === "customers"))
+    .map((x) => ({ id: x.id, u: x.u, name: `${x.first} ${x.last}`.trim(), title: x.title, ...repContact(x.u) }))];   // satış temsilcisi olabilecekler (stok sorumlusu vb. hariç)
 const repOf = (c) => reps().find((r) => r.id === c.salesId) || (c.sales ? reps().find((r) => r.name.split(" ")[0] === c.sales.split(" ")[0]) : null);
 const repSelect = (id, cur, none = "— Atanmadı") => `<select class="input" id="${id}"><option value="">${none}</option>${reps().map((r) => `<option value="${r.id}" ${r.id === cur ? "selected" : ""}>${pfEsc(r.name)}${r.title ? " · " + pfEsc(r.title) : ""}</option>`).join("")}</select>`;
 const PAY_TERMS = ["100% Advance", "30% Advance / 70% before loading", "LC at sight", "Net 30 days", "Net 60 days"];
@@ -610,7 +612,7 @@ const INCOTERMS = ["EXW Düzce", "FCA Istanbul", "FOB Istanbul", "CFR", "CIF", "
 const BRANDS = ["Barber Marmara", "Marmara", "Noir"];
 const optList = (arr, cur) => [...new Set([...(cur && !arr.includes(cur) ? [cur] : []), ...arr])].map((x) => `<option value="${pfEsc(x)}" ${x === cur ? "selected" : ""}>${pfEsc(x)}</option>`).join("");
 const brandChecks = (cls, cur) => BRANDS.map((b) => `<label><input type="checkbox" class="${cls}" value="${b}" ${!cur || cur.includes(b) || (b === "Barber Marmara" && cur.includes("Marmara Barber")) ? "checked" : ""}>${b}</label>`).join("");
-function setRep(c, repId) { const r = reps().find((x) => x.id === repId); c.salesId = r ? r.id : ""; c.sales = r ? r.name : ""; c.salesEmail = r && r.u.includes("@") ? r.u : ""; c.salesTitle = r ? r.title || "" : ""; }
+function setRep(c, repId) { const r = reps().find((x) => x.id === repId); c.salesId = r ? r.id : ""; c.sales = r ? r.name : ""; c.salesEmail = r ? r.email || (r.u.includes("@") ? r.u : "") : ""; c.salesPhone = r ? r.phone || "" : ""; c.salesTitle = r ? r.title || "" : ""; }
 // müşteri kartı › Düzenle
 function custEdit(id) {
   const c = C(id);
@@ -1247,6 +1249,7 @@ function bulkActive(on) {
   state.psel = [];
   toast(`${list.length} ürün ${on ? "aktif edildi" : "pasife alındı"}${on ? "" : " · müşteri portalında görünmez"}`, on ? "check" : "x"); rerender();
 }
+const photoZoom = (img, name) => modal(`<div class="photo-zoom"><img src="${imgSrc(img)}" alt=""><b>${name}</b></div><div class="m-actions"><button class="btn" onclick="closeModal()">Kapat</button></div>`);
 function setProductActive(sku, on) { const p = P(sku); p.active = on; prodHist(p, on ? "Aktif edildi" : "Pasife alındı"); toast(on ? "Ürün aktif · müşteri portalında görünür" : "Ürün pasif · müşteri portalında görünmez", on ? "check" : "x"); rerender(); }
 
 // Tek ürün aç / düzenle
@@ -1386,8 +1389,8 @@ ADMIN.product = (sku) => {
   const bv = (p.dims[0] * p.dims[1] * p.dims[2]) / 1e6;
   const res = ORDERS.filter((o) => o.stage >= 2 && o.stage <= 4 && o.items.some(([s]) => s === sku));
   return `${head(p.name, `${p.sku} · ${p.brand} · ${p.cat}`, `${isActive(p) ? `<span class="pill ok">Aktif</span><button class="btn danger" onclick="setProductActive('${p.sku}',false)">Pasife al</button>` : `<span class="pill err">Pasif · portalda görünmüyor</span><button class="btn" onclick="setProductActive('${p.sku}',true)">Aktif et</button>`}<button class="btn gold" onclick="productForm('${p.sku}')">${ic("edit")} Düzenle</button>`, `<a href="#/admin/products">Ürünler</a> / ${p.sku}`)}
-  <div class="grid g4">
-    <div class="card" style="padding:0;overflow:hidden;background:#f3f3f1;display:grid;place-items:center;min-height:240px">${p.img ? `<img src="${imgSrc(p.img)}" style="max-width:70%;max-height:220px">` : noImg(p)}</div>
+  <div class="grid g4 prod-top">
+    <div class="card prod-photo">${p.img ? `<img src="${imgSrc(p.img)}" alt="${pfEsc(p.name)}" onclick="photoZoom('${pfEsc(p.img)}','${pfEsc(p.name)}')" title="Büyütmek için tıklayın">` : noImg(p)}</div>
     <div class="card"><div class="card-h"><h3>Genel</h3></div><dl class="dl" style="grid-template-columns:90px 1fr"><dt>SKU</dt><dd class="mono">${p.sku}</dd><dt>EAN</dt><dd class="mono">${p.ean}</dd><dt>Marka</dt><dd>${p.brand}</dd><dt>Kategori</dt><dd>${p.cat}</dd><dt>Varyant</dt><dd>${pxVariant(p)}</dd><dt>Durum</dt><dd>Aktif</dd></dl></div>
     <div class="card"><div class="card-h"><h3>Paketleme & Lojistik</h3></div><dl class="dl" style="grid-template-columns:110px 1fr"><dt>pcs / koli</dt><dd>${p.pcsBox}</dd><dt>Koli L×W×H</dt><dd>${p.dims.join(" × ")} cm</dd><dt>Koli CBM</dt><dd>${bv.toFixed(4)} m³</dd><dt>Birim ağırlık</dt><dd>${p.unitKg != null ? p.unitKg + " kg" : "—"}</dd><dt>Koli net</dt><dd>${p.net != null ? p.net + " kg" : (p.kg * 0.86).toFixed(1) + " kg (tahmini)"}</dd><dt>Sınıf</dt><dd>${p.cls}</dd><dt>İstif</dt><dd>${pxStack(p)}</dd><dt>Yön</dt><dd>${pxOrient(p)}</dd><dt>Loose loading</dt><dd class="${p.loose ? "ok-t" : "muted"}">${p.loose ? "Allowed" : "Not allowed"}</dd></dl></div>
     <div class="card"><div class="card-h"><h3>Ticaret / Uyum</h3></div><dl class="dl" style="grid-template-columns:90px 1fr"><dt>GTİP</dt><dd class="mono">${p.gtip || p.hs || "—"}</dd><dt>Menşe</dt><dd>${p.origin}</dd></dl></div>
@@ -1493,12 +1496,12 @@ ADMIN.finance = (arg) => {
   const o = O(state.finOrder) && O(state.finOrder).stage >= 2 ? O(state.finOrder) : payable.find((x) => x.paid + 1 < orderTotal(x)) || payable[0] || ORDERS.find((x) => x.stage >= 2);
   const t = orderTotal(o), ps = payState(o), pi = `PI-${o.no.slice(3)}`;
   const openBal = ORDERS.filter((x) => x.stage >= 2).reduce((s, x) => s + Math.max(0, orderTotal(x) - x.paid), 0);
-  return `${head("Finans & Ödemeler", "", `<select class="input" style="width:280px" onchange="go('admin/finance/'+this.value)">${ORDERS.filter((x) => x.stage >= 2).map((x) => `<option value="${x.no}" ${x.no === o.no ? "selected" : ""}>${x.no} · ${C(x.cust).name} · ${payState(x)[2]}</option>`).join("")}</select>`)}
+  return `${head("Finans & Ödemeler", "", `<button class="btn" onclick="go('admin/order/${o.no}')">${ic("chevL")} Siparişe dön · ${o.no}</button><select class="input" style="width:280px" onchange="go('admin/finance/'+this.value)">${ORDERS.filter((x) => x.stage >= 2).map((x) => `<option value="${x.no}" ${x.no === o.no ? "selected" : ""}>${x.no} · ${C(x.cust).name} · ${payState(x)[2]}</option>`).join("")}</select>`)}
   <div class="grid g4">${kpi(money(Math.round(openBal)), "Açık Bakiye", "", "wallet")}${kpi("$386,200", "Eylül Tahsilat", "22 ödeme", "check")}${kpi(ORDERS.filter((x) => x.stage === 2).length, "Ödeme Bekleyen", "Proforma gönderildi", "clock")}${kpi("$1,250", "Customer Credit", "Fazla ödemeler", "bank")}</div>
   <div class="grid g2 mt">
     <div class="card"><div class="card-h"><h3>Proforma Invoice</h3><span class="pill plain">${pi} / Rev.1</span></div>
       <div class="stat-row"><span>Sipariş</span><a class="strong mono" href="#/admin/order/${o.no}">${o.no}</a></div><div class="stat-row"><span>Müşteri</span><b>${C(o.cust).flag} ${C(o.cust).name}</b></div><div class="stat-row"><span>Para birimi</span><b>${o.currency}</b></div><div class="stat-row"><span>Sipariş toplamı</span><b>${money(t, o.currency)}</b></div><div class="stat-row"><span>Ödeme şartı</span><b>100% Advance</b></div>
-      <div class="card flat mt"><div class="between"><b style="font:500 13px var(--display);letter-spacing:.08em">BANKA — ${o.currency} VARSAYILAN</b><span class="pill ok plain">Otomatik</span></div><p class="muted mono" style="margin:8px 0 0">Bank A · ${o.currency} Account · TR12 0001 2345 6789 0000 0001 · SWIFT TGBATRIS</p></div>
+      <div class="card flat mt"><div class="between"><b style="font:500 13px var(--display);letter-spacing:.08em">BANKA — ${o.currency} VARSAYILAN</b><span class="pill ok plain">Otomatik</span></div><p class="muted mono" style="margin:8px 0 0">${(() => { const bk = BANKS[o.currency] || BANKS.USD; return `${phx(bk.bank)} · ${o.currency} · ${phx(bk.iban)} · SWIFT ${phx(bk.swift)}`; })()}</p></div>
       <div class="row mt"><button class="btn gold" onclick="openDoc('${o.no}','pi')">${ic("download")} PDF Oluştur</button><button class="btn warn" onclick="newRevision()">Yeni Revizyon</button></div>
       <div class="section-title">Revizyon Geçmişi</div>
       ${state.piRevs.slice().reverse().map(([r, d, n], i) => `<div class="stat-row"><span style="color:var(--text)">${ic("file")} ${pi} / ${r} <small class="muted">· ${n}</small></span><span class="row"><small class="muted">${d}</small>${i === 0 ? '<span class="pill ok plain">Güncel</span>' : ""}</span></div>`).join("")}</div>
@@ -1656,14 +1659,14 @@ ADMIN.users = () => {
   const list = state.users || [];
   const rows = list.map((u) => {
     const all = u.perms.length === PERMS.length;
-    return `<tr class="${u.active === false ? "off" : ""}"><td><b>${pfEsc(`${u.first} ${u.last}`.trim())}</b>${u.builtIn ? ' <span class="pill plain">Yerleşik</span>' : ""}</td><td class="muted notranslate">${pfEsc(u.u)}</td><td>${pfEsc(u.title || "—")}</td>
+    return `<tr class="${u.active === false ? "off" : ""}"><td><b>${pfEsc(`${u.first} ${u.last}`.trim())}</b>${u.builtIn ? ' <span class="pill plain">Yerleşik</span>' : ""}</td><td class="muted notranslate">${pfEsc(u.u)}</td><td>${pfEsc(u.title || "—")}</td><td class="notranslate">${u.email || u.phone ? `${u.email ? `<div>${pfEsc(u.email)}</div>` : ""}${u.phone ? `<small class="muted">${pfEsc(u.phone)}</small>` : ""}` : '<span class="dim">—</span>'}</td>
       <td>${all ? '<span class="pill gold">Tüm yetkiler</span>' : u.perms.length ? u.perms.map((p) => `<span class="pill plain">${permLabel(p)}</span>`).join(" ") : '<span class="dim">Yetki yok</span>'}</td>
       <td>${u.active === false ? '<span class="pill err">Pasif</span>' : '<span class="pill ok">Aktif</span>'}</td>
-      <td class="r">${u.builtIn ? '<small class="muted">sistem hesabı</small>' : `<div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm" onclick="userForm('${u.id}')">${ic("edit")} Düzenle</button><button class="btn sm" onclick="userResetPw('${u.id}')">Şifre sıfırla</button><button class="btn sm ${u.active === false ? "" : "danger"}" onclick="userSetActive('${u.id}',${u.active === false})">${u.active === false ? "Aktif et" : "Pasife al"}</button></div>`}</td></tr>`;
+      <td class="r">${u.builtIn ? `<button class="btn sm" onclick="userContact('${u.id}')">${ic("mail")} İletişim</button>` : `<div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm" onclick="userContact('${u.id}')">${ic("mail")} İletişim</button><button class="btn sm" onclick="userForm('${u.id}')">${ic("edit")} Düzenle</button><button class="btn sm" onclick="userResetPw('${u.id}')">Şifre sıfırla</button><button class="btn sm ${u.active === false ? "" : "danger"}" onclick="userSetActive('${u.id}',${u.active === false})">${u.active === false ? "Aktif et" : "Pasife al"}</button></div>`}</td></tr>`;
   }).join("");
   return `${head("Kullanıcılar & Yetkiler", "", `<button class="btn gold" onclick="userForm()">${ic("plus")} Kullanıcı ekle</button>`)}
-  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ad Soyad</th><th>Giriş adı</th><th>Unvan / Görev</th><th>Yetkiler</th><th>Durum</th><th class="r"></th></tr></thead><tbody>
-  ${state.usersErr ? `<tr><td colspan="6"><div class="notice err">${ic("alert")}<span>Kullanıcılar yüklenemedi: ${pfEsc(state.usersErr)}</span></div></td></tr>` : !state.users ? `<tr><td colspan="6" class="muted">Yükleniyor…</td></tr>` : rows}
+  <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ad Soyad</th><th>Giriş adı</th><th>Unvan / Görev</th><th>İletişim (müşteriye görünen)</th><th>Yetkiler</th><th>Durum</th><th class="r"></th></tr></thead><tbody>
+  ${state.usersErr ? `<tr><td colspan="7"><div class="notice err">${ic("alert")}<span>Kullanıcılar yüklenemedi: ${pfEsc(state.usersErr)}</span></div></td></tr>` : !state.users ? `<tr><td colspan="7" class="muted">Yükleniyor…</td></tr>` : rows}
   </tbody></table></div></div>
   <div class="notice info mt">${ic("info")}<span>Kullanıcı, admin paneline e-posta ve şifresiyle girer; menüde yalnız yetkili olduğu sayfaları görür. Pasife alınan kullanıcı anında erişimini kaybeder. Şifreler yalnız oluşturulurken ve sıfırlanırken bir kez gösterilir.</span></div>`;
 };
@@ -1681,6 +1684,24 @@ function userForm(id) {
   </div>
   <p class="err-t" id="ufErr" style="font-size:13px"></p>
   <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="userSave(${u ? `'${u.id}'` : ""})">${u ? "Kaydet" : "Kullanıcıyı oluştur"}</button></div>`);
+}
+function userContact(id) {
+  const u = (state.users || []).find((x) => x.id === id); if (!u) return;
+  modal(`<h2>İletişim bilgisi</h2><p class="muted" style="margin-top:-6px"><b>${pfEsc(`${u.first} ${u.last}`.trim())}</b> · satış temsilcisi olarak atandığı müşterilerin portalındaki İletişim sayfasında görünür.</p>
+  <div class="form cols2"><div class="field"><label>E-posta</label><input class="input notranslate" id="ucEmail" type="email" value="${pfEsc(u.email || (u.u.includes("@") ? u.u : ""))}" placeholder="ad.soyad@sensokozmetik.com.tr"></div>
+  <div class="field"><label>Telefon / WhatsApp</label><input class="input notranslate" id="ucPhone" value="${pfEsc(u.phone || "")}" placeholder="+90 5xx xxx xx xx"></div></div>
+  <p class="err-t" id="ucErr" style="font-size:13px"></p>
+  <div class="m-actions"><button class="btn" onclick="closeModal()">Vazgeç</button><button class="btn gold" onclick="userContactSave('${id}')">Kaydet</button></div>`);
+}
+async function userContactSave(id) {
+  const email = $("#ucEmail").value.trim(), phone = $("#ucPhone").value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return ($("#ucErr").textContent = "Geçerli bir e-posta girin");
+  try {
+    const r = await usersApi("POST", { action: "contact", id, email, phone });
+    const u = (state.users || []).find((x) => x.id === id); STORE.contacts = { ...(STORE.contacts || {}), [u.u]: { email: r.email, phone: r.phone } };
+    CUSTOMERS.forEach((c) => { if (c.salesId === id) { c.salesEmail = r.email; c.salesPhone = r.phone; } });
+    await loadUsers(); closeModal(); toast(`İletişim bilgisi kaydedildi${r.customers ? ` · ${r.customers} müşteriye yansıtıldı` : ""}`);
+  } catch (e) { $("#ucErr").textContent = e.message; }
 }
 function userPreset(i) { if (i === "") return; const p = ROLE_PRESETS[+i][1]; document.querySelectorAll(".ufPerm").forEach((c) => (c.checked = p.includes(c.value))); if (!$("#ufTitle").value) $("#ufTitle").value = ROLE_PRESETS[+i][0]; }
 const pwModal = (title, email, pw) => modal(`<h2>${title}</h2><p class="muted">Bu bilgileri kullanıcıya iletin. Şifre bir daha gösterilmeyecek.</p>
@@ -1736,7 +1757,7 @@ const custNotices = () => sortOrders(ORDERS.filter((o) => o.cust === ME && o.cus
 const noticeCards = () => custNotices().map((o) => `<div class="notice gold" style="margin-bottom:12px">${ic("file")}<span><b>Your final proforma invoice is ready — order ${o.no}.</b> Your order is ready to ship; please review the proforma and complete any remaining payment.</span><button class="btn sm" onclick="go('customer/order/${o.no}')">View</button></div>`).join("");
 // Müşteri ana sayfası: “Nasıl sipariş verilir” videosu (portal diline göre)
 const howToCard = () => { const vl = ["tr", "en", "es", "de", "ru"].includes(LANG) ? LANG : "en";
-  return `<div class="card mt how-card"><div><span class="how-badge">${ic("info")} Video · 0:41</span><h3>How to place an order</h3><p class="muted">Watch the step-by-step guide: find products, add boxes, check your addresses, place your order and download your documents.</p></div>
+  return `<div class="card mt how-card"><div><span class="how-badge">${ic("info")} Senso Cosmetics · Video · 0:41</span><h3>How to place an order</h3><p class="muted">Watch the step-by-step guide: find products, add boxes, check your addresses, place your order and download your documents.</p></div>
   <video class="notranslate" controls preload="none" playsinline poster="media/how-to-order-${vl}.jpg" src="media/how-to-order-${vl}.mp4"></video></div>`; };
 CUST.dashboard = () => {
   const mine = ORDERS.filter((o) => o.cust === ME);
@@ -1848,7 +1869,7 @@ function reorder(no) {
 ADMIN.neworder = () => CUST.products();
 ADMIN.checkout = () => CUST.checkout();
 CUST.contact = () => {
-  const c = C(ME), rep = repOf(c), key = (rep?.name || c.sales || "").split(" ")[0], r = { ...(CONTACT.reps[key] || {}), ...(c.salesEmail ? { email: c.salesEmail } : rep && rep.u.includes("@") ? { email: rep.u } : {}) };
+  const c = C(ME), rep = repOf(c), r = { email: c.salesEmail || rep?.email || (rep && rep.u.includes("@") ? rep.u : ""), phone: c.salesPhone || rep?.phone || "" };
   const row = (i, l, v, href) => `<div class="stat-row"><span>${ic(i)} ${l}</span>${href ? `<a class="strong notranslate" href="${href}">${v}</a>` : `<b class="notranslate">${v}</b>`}</div>`;
   return `${head("Contact", "")}
   <div class="grid g2">

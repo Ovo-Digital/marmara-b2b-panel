@@ -23,7 +23,7 @@ function scopedView(doc, sc) {
   if (sc.orders) { v.orders = doc.orders; v.logs = doc.logs; }
   if (sc.customers) v.customers = doc.customers;
   if (sc.meta) v.meta = doc.meta;
-  if (sc.staff) v.staff = (doc.staff || []).map(({ h, ...r }) => r);
+  if (sc.staff) { v.staff = (doc.staff || []).map(({ h, ...r }) => r); v.contacts = doc.contacts || {}; }
   return v;
 }
 const STOCK_FIELDS = ["stock", "stockLog", "critical"];
@@ -43,7 +43,7 @@ function scopedChanges(doc, ch, sc) {
   }
   return out;
 }
-const adminView = (doc) => ({ ...doc, regs: doc.regs.map(({ h, ...r }) => r), staff: (doc.staff || []).map(({ h, ...r }) => r) });   // şifre özetleri admin'e de gitmez
+const adminView = (doc) => ({ ...doc, contacts: doc.contacts || {}, regs: doc.regs.map(({ h, ...r }) => r), staff: (doc.staff || []).map(({ h, ...r }) => r) });   // şifre özetleri admin'e de gitmez
 
 module.exports = async (req, res) => {
   L.cors(res);

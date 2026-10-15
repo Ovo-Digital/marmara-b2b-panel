@@ -1,5 +1,11 @@
 // Otomatik üretilen çeviri sözlüğü: anahtar = ekrandaki metin (rakam/kod/ad yerine #).
 const I18N = {
+  "Siparişe dön": {"tr":"Siparişe dön","en":"Back to order","es":"Volver al pedido","de":"Zurück zur Bestellung","ru":"Назад к заказу"},
+  "İletişim bilgisi": {"tr":"İletişim bilgisi","en":"Contact details","es":"Datos de contacto","de":"Kontaktdaten","ru":"Контактные данные"},
+  "İletişim (müşteriye görünen)": {"tr":"İletişim (müşteriye görünen)","en":"Contact (shown to customers)","es":"Contacto (visible para clientes)","de":"Kontakt (für Kunden sichtbar)","ru":"Контакт (виден клиентам)"},
+  "Telefon / WhatsApp": {"tr":"Telefon / WhatsApp","en":"Phone / WhatsApp","es":"Teléfono / WhatsApp","de":"Telefon / WhatsApp","ru":"Телефон / WhatsApp"},
+  "Büyütmek için tıklayın": {"tr":"Büyütmek için tıklayın","en":"Click to enlarge","es":"Haga clic para ampliar","de":"Zum Vergrößern klicken","ru":"Нажмите, чтобы увеличить"},
+  "Senso Cosmetics": {"tr":"Senso Kozmetik","en":"Senso Cosmetics","es":"Senso Cosméticos","de":"Senso Kosmetik","ru":"Senso Косметика"},
   "Kritik": {"tr":"Kritik","en":"Critical","es":"Crítico","de":"Kritisch","ru":"Критично"},
   "Stok yok": {"tr":"Stok yok","en":"Out of stock","es":"Sin stock","de":"Nicht vorrätig","ru":"Нет в наличии"},
   "Girilmedi": {"tr":"Girilmedi","en":"Not entered","es":"Sin datos","de":"Nicht erfasst","ru":"Не указано"},

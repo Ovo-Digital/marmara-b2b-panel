@@ -17,7 +17,7 @@ const hashPw = (u, p) => sha(String(u).toLowerCase() + ":" + p);
 const STAFF = [
   { u: "admin", h: "f7909ea880b91b92e4feff9b7bd28bd0c7fec8d0d599e8f206d6bf76d6758635", role: "admin", name: "Volkan Koçkan", title: "Super Admin" },
   { u: "ferhat", h: "a3df8603cbc286258c4700f8b53678a4c80e2c1adf5875e377cbadc8619d245b", role: "admin", name: "Ferhat Şahin", title: "İhracat Bölge Müdürü", dash: "sales" },
-  { u: "gozde", h: "c157d3340fe24107ff6a915bae74f822c5c0a64edb42ce2f3f50a097eed1a10d", role: "admin", name: "Gözde", title: "Export Manager / Final Approver", dash: "approve" },
+  { u: "gozde", h: "c157d3340fe24107ff6a915bae74f822c5c0a64edb42ce2f3f50a097eed1a10d", role: "admin", name: "Gözde Yorgun", title: "Export Manager / Final Approver", dash: "approve" },
 ];
 // Demo müşteri hesabı (ABC Distribution) — demo verisinde var, şifresi özetli
 const DEMO_CUSTOMERS = [{ u: "abc", h: "3d4d0b6d58b04a1548f25a687aedfdfe91d85e66b677c12d502391e7019c297b", cust: "C-1021" }];

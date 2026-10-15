@@ -75,8 +75,8 @@ const MARKETING = [
 
 const USERS = [
   { name: "Volkan Koçkan", email: "volkan@ovodigi.com", role: "Super Admin", scope: "Tümü" },
-  { name: "Gözde", email: "gozde@marmarabarber.com", role: "Super Admin", scope: "Tümü" },
-  { name: "Ferhat", email: "ferhat@marmarabarber.com", role: "Super Admin", scope: "Tümü" },
+  { name: "Gözde Yorgun", email: "gozde@marmarabarber.com", role: "Super Admin", scope: "Tümü" },
+  { name: "Ferhat Şahin", email: "ferhat@marmarabarber.com", role: "Super Admin", scope: "Tümü" },
   { name: "Operasyon Ekibi", email: "ops@marmarabarber.com", role: "Operations", scope: "Tümü" },
   { name: "Finans", email: "finans@marmarabarber.com", role: "Finance", scope: "Tümü" },
   { name: "Regülasyon", email: "regulatory@marmarabarber.com", role: "Regulatory", scope: "Dokümanlar" },
@@ -109,5 +109,4 @@ const CONTACT = {
   phone: "+90 216 479 12 00",
   address: "Baklacı Mah. Fatih Cad. Çevre Sok. No:20 Beykoz - Istanbul - TURKEY",
   hours: "Mon–Fri 09:00–18:00 (GMT+3)",
-  reps: { Ferhat: { email: "ferhat@marmarabarber.com" } },
 };
